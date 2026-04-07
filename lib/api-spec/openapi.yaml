@@ -3,20 +3,36 @@ info:
   # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: M.P. Warehousing & Logistics Corporation API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: auth
+    description: Authentication
+  - name: users
+    description: User management
+  - name: bills
+    description: Bill management
+  - name: commodities
+    description: Commodity management
+  - name: depositors
+    description: Depositor management
+  - name: approvals
+    description: Bill approvals
+  - name: notifications
+    description: Notifications
+  - name: dashboard
+    description: Dashboard stats
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,7 +40,826 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /v1/auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login with email and password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/auth/change-password:
+    post:
+      operationId: changePassword
+      tags: [auth]
+      summary: Change user password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ChangePasswordRequest"
+      responses:
+        "200":
+          description: Password changed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/users:
+    get:
+      operationId: listUsers
+      tags: [users]
+      summary: List all users (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [admin, operator]
+      responses:
+        "200":
+          description: List of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/User"
+    post:
+      operationId: createUser
+      tags: [users]
+      summary: Create a new operator user (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/users/{id}:
+    get:
+      operationId: getUser
+      tags: [users]
+      summary: Get user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: User
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateUser
+      tags: [users]
+      summary: Update user profile
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+      responses:
+        "200":
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/commodities:
+    get:
+      operationId: listCommodities
+      tags: [commodities]
+      summary: List commodities
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of commodities
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Commodity"
+    post:
+      operationId: createCommodity
+      tags: [commodities]
+      summary: Create commodity (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateCommodityRequest"
+      responses:
+        "201":
+          description: Commodity created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Commodity"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/commodities/{id}:
+    get:
+      operationId: getCommodity
+      tags: [commodities]
+      summary: Get commodity by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Commodity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Commodity"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    patch:
+      operationId: updateCommodity
+      tags: [commodities]
+      summary: Update commodity (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCommodityRequest"
+      responses:
+        "200":
+          description: Updated commodity
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Commodity"
+
+  /v1/depositors:
+    get:
+      operationId: listDepositors
+      tags: [depositors]
+      summary: List depositors
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of depositors
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Depositor"
+    post:
+      operationId: createDepositor
+      tags: [depositors]
+      summary: Create depositor (admin only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateDepositorRequest"
+      responses:
+        "201":
+          description: Depositor created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Depositor"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/depositors/{id}:
+    get:
+      operationId: getDepositor
+      tags: [depositors]
+      summary: Get depositor by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Depositor
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Depositor"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/bills:
+    get:
+      operationId: listBills
+      tags: [bills]
+      summary: List bills with optional filters
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [pending, approved, rejected]
+        - in: query
+          name: branch_name
+          schema:
+            type: string
+        - in: query
+          name: month_year
+          schema:
+            type: string
+        - in: query
+          name: commodity_id
+          schema:
+            type: integer
+        - in: query
+          name: created_by
+          schema:
+            type: integer
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: Paginated list of bills
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillListResponse"
+    post:
+      operationId: createBill
+      tags: [bills]
+      summary: Create a new bill (operator only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateBillRequest"
+      responses:
+        "201":
+          description: Bill created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillDetail"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/bills/{id}:
+    get:
+      operationId: getBill
+      tags: [bills]
+      summary: Get bill by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Bill detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillDetail"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/bills/{id}/request-edit:
+    post:
+      operationId: requestBillEdit
+      tags: [bills]
+      summary: Request edit on a bill (operator only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestEditRequest"
+      responses:
+        "201":
+          description: Edit request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillVersion"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/bills/{id}/request-delete:
+    post:
+      operationId: requestBillDelete
+      tags: [bills]
+      summary: Request delete on a bill (operator only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "201":
+          description: Delete request created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillVersion"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/bills/{id}/versions:
+    get:
+      operationId: getBillVersions
+      tags: [bills]
+      summary: Get versions/edit requests for a bill
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: List of bill versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BillVersion"
+
+  /v1/approvals:
+    get:
+      operationId: listApprovals
+      tags: [approvals]
+      summary: List all approvals (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of approvals
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BillApproval"
+
+  /v1/approvals/approve/{billId}:
+    post:
+      operationId: approveBill
+      tags: [approvals]
+      summary: Approve a bill (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: billId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApproveBillRequest"
+      responses:
+        "200":
+          description: Bill approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillDetail"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/approvals/reject/{billId}:
+    post:
+      operationId: rejectBill
+      tags: [approvals]
+      summary: Reject a bill (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: billId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectRequest"
+      responses:
+        "200":
+          description: Bill rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillDetail"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/approvals/versions/{versionId}/approve:
+    post:
+      operationId: approveVersion
+      tags: [approvals]
+      summary: Approve a bill version/edit request (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: versionId
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Version approved
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillVersion"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/approvals/versions/{versionId}/reject:
+    post:
+      operationId: rejectVersion
+      tags: [approvals]
+      summary: Reject a bill version/edit request (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: versionId
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RejectRequest"
+      responses:
+        "200":
+          description: Version rejected
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BillVersion"
+        "400":
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/approvals/pending-versions:
+    get:
+      operationId: listPendingVersions
+      tags: [approvals]
+      summary: List all pending version/edit requests (admin only)
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: List of pending versions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BillVersion"
+
+  /v1/notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: Get notifications for current user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: unread_only
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: List of notifications
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+
+  /v1/notifications/{id}/read:
+    patch:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark notification as read
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Notification updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Notification"
+
+  /v1/notifications/read-all:
+    patch:
+      operationId: markAllNotificationsRead
+      tags: [notifications]
+      summary: Mark all notifications as read
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: All notifications marked read
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+
+  /v1/dashboard/stats:
+    get:
+      operationId: getDashboardStats
+      tags: [dashboard]
+      summary: Get dashboard statistics
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Dashboard statistics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardStats"
+
+  /v1/bills/export:
+    get:
+      operationId: exportBills
+      tags: [bills]
+      summary: Export bills to CSV (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+        - in: query
+          name: branch_name
+          schema:
+            type: string
+        - in: query
+          name: month_year
+          schema:
+            type: string
+      responses:
+        "200":
+          description: CSV export
+          content:
+            text/csv:
+              schema:
+                type: string
+
+  /v1/upload/image:
+    post:
+      operationId: uploadImage
+      tags: [bills]
+      summary: Upload a remark image
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+                - file
+      responses:
+        "200":
+          description: Upload successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UploadResponse"
+
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   schemas:
     HealthStatus:
       type: object
@@ -34,3 +869,587 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+      required:
+        - message
+
+    UploadResponse:
+      type: object
+      properties:
+        url:
+          type: string
+      required:
+        - url
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+      required:
+        - email
+        - password
+
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: "#/components/schemas/User"
+      required:
+        - token
+        - user
+
+    ChangePasswordRequest:
+      type: object
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+      required:
+        - current_password
+        - new_password
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, operator]
+        branch_name:
+          type: ["string", "null"]
+        district_name:
+          type: ["string", "null"]
+        mobile_number:
+          type: ["string", "null"]
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - email
+        - role
+        - created_at
+
+    CreateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        role:
+          type: string
+          enum: [admin, operator]
+        branch_name:
+          type: string
+        district_name:
+          type: string
+        mobile_number:
+          type: string
+      required:
+        - name
+        - email
+        - password
+        - role
+
+    UpdateUserRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        branch_name:
+          type: string
+        district_name:
+          type: string
+        mobile_number:
+          type: string
+
+    Commodity:
+      type: object
+      properties:
+        id:
+          type: integer
+        crop_name:
+          type: string
+        crop_year:
+          type: string
+        per_bag_per_month:
+          type: number
+      required:
+        - id
+        - crop_name
+        - crop_year
+        - per_bag_per_month
+
+    CreateCommodityRequest:
+      type: object
+      properties:
+        crop_name:
+          type: string
+        crop_year:
+          type: string
+        per_bag_per_month:
+          type: number
+      required:
+        - crop_name
+        - crop_year
+        - per_bag_per_month
+
+    UpdateCommodityRequest:
+      type: object
+      properties:
+        crop_name:
+          type: string
+        crop_year:
+          type: string
+        per_bag_per_month:
+          type: number
+
+    Depositor:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        gst_no:
+          type: ["string", "null"]
+        total_gst:
+          type: ["number", "null"]
+      required:
+        - id
+        - name
+
+    CreateDepositorRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        gst_no:
+          type: string
+        total_gst:
+          type: number
+      required:
+        - name
+
+    Bill:
+      type: object
+      properties:
+        id:
+          type: integer
+        serial_no:
+          type: integer
+        created_by:
+          type: integer
+        district:
+          type: ["string", "null"]
+        branch_name:
+          type: ["string", "null"]
+        godown_name:
+          type: ["string", "null"]
+        bill_no:
+          type: ["string", "null"]
+        commodity_id:
+          type: integer
+        crop_year:
+          type: ["string", "null"]
+        financial_year:
+          type: ["string", "null"]
+        month_year:
+          type: ["string", "null"]
+        rate_per_bag:
+          type: ["number", "null"]
+        opening_balance:
+          type: ["integer", "null"]
+        closing_balance:
+          type: ["integer", "null"]
+        received_bags:
+          type: ["integer", "null"]
+        issue_bags:
+          type: ["integer", "null"]
+        reserve_bags:
+          type: ["integer", "null"]
+        chargeable_bags:
+          type: ["integer", "null"]
+        total_charge:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        is_locked:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - serial_no
+        - created_by
+        - commodity_id
+        - status
+        - is_locked
+        - created_at
+
+    BillDetail:
+      type: object
+      properties:
+        id:
+          type: integer
+        serial_no:
+          type: integer
+        created_by:
+          type: integer
+        district:
+          type: ["string", "null"]
+        branch_name:
+          type: ["string", "null"]
+        godown_name:
+          type: ["string", "null"]
+        bill_no:
+          type: ["string", "null"]
+        commodity_id:
+          type: integer
+        crop_year:
+          type: ["string", "null"]
+        financial_year:
+          type: ["string", "null"]
+        month_year:
+          type: ["string", "null"]
+        rate_per_bag:
+          type: ["number", "null"]
+        opening_balance:
+          type: ["integer", "null"]
+        closing_balance:
+          type: ["integer", "null"]
+        received_bags:
+          type: ["integer", "null"]
+        issue_bags:
+          type: ["integer", "null"]
+        reserve_bags:
+          type: ["integer", "null"]
+        chargeable_bags:
+          type: ["integer", "null"]
+        total_charge:
+          type: ["number", "null"]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        is_locked:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        creator:
+          $ref: "#/components/schemas/User"
+        commodity:
+          $ref: "#/components/schemas/Commodity"
+        approval:
+          oneOf:
+            - $ref: "#/components/schemas/BillApproval"
+            - type: "null"
+        versions:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillVersion"
+      required:
+        - id
+        - serial_no
+        - created_by
+        - commodity_id
+        - status
+        - is_locked
+        - created_at
+        - creator
+        - commodity
+        - versions
+
+    BillListResponse:
+      type: object
+      properties:
+        bills:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillDetail"
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        total_pages:
+          type: integer
+      required:
+        - bills
+        - total
+        - page
+        - limit
+        - total_pages
+
+    CreateBillRequest:
+      type: object
+      properties:
+        district:
+          type: string
+        branch_name:
+          type: string
+        godown_name:
+          type: string
+        bill_no:
+          type: string
+        commodity_id:
+          type: integer
+        crop_year:
+          type: string
+        financial_year:
+          type: string
+        month_year:
+          type: string
+        rate_per_bag:
+          type: number
+        opening_balance:
+          type: integer
+        closing_balance:
+          type: integer
+        received_bags:
+          type: integer
+        issue_bags:
+          type: integer
+        reserve_bags:
+          type: integer
+        chargeable_bags:
+          type: integer
+      required:
+        - commodity_id
+
+    BillVersion:
+      type: object
+      properties:
+        id:
+          type: integer
+        bill_id:
+          type: integer
+        data_json:
+          type: object
+          additionalProperties: true
+        version_type:
+          type: string
+          enum: [edit, delete]
+        status:
+          type: string
+          enum: [pending, approved, rejected]
+        created_by:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        creator:
+          $ref: "#/components/schemas/User"
+        bill:
+          oneOf:
+            - $ref: "#/components/schemas/Bill"
+            - type: "null"
+      required:
+        - id
+        - bill_id
+        - data_json
+        - version_type
+        - status
+        - created_by
+        - created_at
+        - creator
+
+    RequestEditRequest:
+      type: object
+      properties:
+        district:
+          type: string
+        branch_name:
+          type: string
+        godown_name:
+          type: string
+        bill_no:
+          type: string
+        commodity_id:
+          type: integer
+        crop_year:
+          type: string
+        financial_year:
+          type: string
+        month_year:
+          type: string
+        rate_per_bag:
+          type: number
+        opening_balance:
+          type: integer
+        closing_balance:
+          type: integer
+        received_bags:
+          type: integer
+        issue_bags:
+          type: integer
+        reserve_bags:
+          type: integer
+        chargeable_bags:
+          type: integer
+
+    BillApproval:
+      type: object
+      properties:
+        id:
+          type: integer
+        bill_id:
+          type: integer
+        depositor_id:
+          type: ["integer", "null"]
+        pass_amount:
+          type: ["number", "null"]
+        payment_method:
+          type: ["string", "null"]
+        neft_no:
+          type: ["string", "null"]
+        remark:
+          type: ["string", "null"]
+        remark_image_url:
+          type: ["string", "null"]
+        approved_by:
+          type: ["integer", "null"]
+        approved_at:
+          type: ["string", "null"]
+          format: date-time
+        depositor:
+          oneOf:
+            - $ref: "#/components/schemas/Depositor"
+            - type: "null"
+        approver:
+          oneOf:
+            - $ref: "#/components/schemas/User"
+            - type: "null"
+      required:
+        - id
+        - bill_id
+
+    ApproveBillRequest:
+      type: object
+      properties:
+        depositor_id:
+          type: integer
+        pass_amount:
+          type: number
+        payment_method:
+          type: string
+        neft_no:
+          type: string
+        remark:
+          type: string
+        remark_image_url:
+          type: string
+      required:
+        - depositor_id
+        - pass_amount
+        - payment_method
+
+    RejectRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+      required:
+        - reason
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+        user_id:
+          type: integer
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [web, email]
+        is_read:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - user_id
+        - title
+        - message
+        - type
+        - is_read
+        - created_at
+
+    DashboardStats:
+      type: object
+      properties:
+        total_bills:
+          type: integer
+        pending_bills:
+          type: integer
+        approved_bills:
+          type: integer
+        rejected_bills:
+          type: integer
+        total_approved_amount:
+          type: number
+        pending_edit_requests:
+          type: integer
+        bills_by_status:
+          type: array
+          items:
+            type: object
+            properties:
+              status:
+                type: string
+              count:
+                type: integer
+            required:
+              - status
+              - count
+        recent_bills:
+          type: array
+          items:
+            $ref: "#/components/schemas/BillDetail"
+        unread_notifications:
+          type: integer
+      required:
+        - total_bills
+        - pending_bills
+        - approved_bills
+        - rejected_bills
+        - total_approved_amount
+        - pending_edit_requests
+        - bills_by_status
+        - recent_bills
+        - unread_notifications

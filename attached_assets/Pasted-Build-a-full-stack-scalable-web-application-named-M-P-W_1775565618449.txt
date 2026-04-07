@@ -1,0 +1,348 @@
+Build a full-stack scalable web application named:
+
+"M.P. Warehousing & Logistics Corporation"
+
+Tech Stack:
+
+* Frontend: React (JavaScript) + Vite + TailwindCSS
+* Backend: FastAPI (Python)
+* Database: PostgreSQL
+* ORM: SQLAlchemy (async preferred)
+* Auth: JWT-based authentication
+* Email: Use SMTP (mock allowed but structure should support real email sending)
+* File Upload: Support image upload (for remark screenshot)
+
+---
+
+CORE REQUIREMENTS:
+
+There are 2 roles:
+
+1. Admin
+2. Branch Operator
+
+---
+
+DATABASE DESIGN (IMPORTANT: FOLLOW STRICTLY)
+
+User:
+
+* id (PK)
+* name
+* email (unique)
+* password_hash
+* role (admin/operator)
+* branch_name
+* district_name
+* mobile_number
+* created_at
+
+Commodity:
+
+* id (PK)
+* crop_name
+* crop_year
+* per_bag_per_month
+* UNIQUE(crop_name, crop_year)
+
+Depositor:
+
+* id (PK)
+* name
+* gst_no
+* total_gst
+
+Bill (MAIN TABLE):
+
+* id (PK)
+
+* serial_no (AUTO-INCREMENT, GLOBAL, UNIQUE)
+
+* created_by (FK → User)
+
+* district
+
+* branch_name
+
+* godown_name
+
+* bill_no
+
+* commodity_id (FK)
+
+* crop_year
+
+* financial_year
+
+* month_year
+
+* rate_per_bag
+
+* opening_balance
+
+* closing_balance
+
+* received_bags
+
+* issue_bags
+
+* reserve_bags
+
+* chargeable_bags
+
+* total_charge (formula: received_bags * commodity.per_bag_per_month / 2)
+
+* status (pending/approved/rejected)
+
+* is_locked (true after approval)
+
+* created_at
+
+BillVersion (IMPORTANT FOR EDIT FLOW):
+
+* id (PK)
+* bill_id (FK)
+* data_json (store edited fields snapshot)
+* status (pending/approved/rejected)
+* created_by
+* created_at
+
+BillApproval:
+
+* id (PK)
+* bill_id (FK)
+* depositor_id (FK)
+* pass_amount
+* payment_method
+* neft_no
+* remark
+* remark_image_url
+* approved_by
+* approved_at
+
+Notification:
+
+* id (PK)
+* user_id (FK)
+* title
+* message
+* type (email/web)
+* is_read
+* created_at
+
+---
+
+BACKEND FEATURES (FASTAPI)
+
+Implement modular structure:
+
+/app
+/api
+/models
+/schemas
+/services
+/core
+/utils
+
+FEATURES:
+
+AUTH:
+
+* Login (JWT)
+* Role-based access middleware
+
+ADMIN:
+
+* Create Branch Operator
+
+* Add/Edit Commodity
+
+* Add Depositor
+
+* View All Bills (with filters)
+
+* Approve / Reject Bill
+
+* While approving:
+
+  * Must fill: depositor, pass amount, payment method, neft no, remark, optional image
+
+* View Bill Version Requests:
+
+  * Show side-by-side comparison (original vs edited)
+  * Highlight changed fields
+  * Approve/Reject edit
+
+* Export:
+
+  * Export all or filtered bills to Excel (use pandas or openpyxl)
+  * PDF optional but structure-ready
+
+* Dashboard:
+
+  * Total bills count
+  * Total approved amount
+
+OPERATOR:
+
+* Add Bill (default status = pending)
+* View Own Bills (filters)
+* Request Edit:
+
+  * Creates BillVersion
+* Request Delete:
+
+  * Mark via BillVersion type = delete
+* Profile Update
+* Forgot Password (basic flow or mock)
+
+---
+
+BUSINESS RULES:
+
+* Once bill is approved → is_locked = true → cannot be edited
+* Serial number must be global and consistent
+* Commodity dropdown comes from admin-created commodities
+* Depositor only linked during approval
+* Edit requests DO NOT overwrite original bill until approved
+* Maintain audit-safe structure
+
+---
+
+NOTIFICATIONS:
+
+Trigger notifications for:
+
+* Bill Created → notify Admin
+* Bill Approved/Rejected → notify Operator
+* Edit/Delete Request → notify Admin
+* Edit Approved/Rejected → notify Operator
+
+Implement:
+
+* Email service (SMTP, can log to console)
+* Web notifications (store in DB + fetch API)
+
+---
+
+FRONTEND (REACT)
+
+Structure:
+
+/src
+/pages
+/components
+/services
+/hooks
+/layouts
+
+UI REQUIREMENTS:
+
+* Sidebar Navigation
+* Clean minimalist UI
+* Use Tailwind
+
+PAGES:
+
+* Login Page
+
+ADMIN:
+
+* Dashboard
+* Add Commodity
+* Add Depositor
+* View All Bills
+* Bill Approval Page
+* Bill Version Approval Page
+* Single Bill View
+
+OPERATOR:
+
+* Add Bill Page
+* View Bills Page
+* Request Edit Page
+* Profile Page
+
+COMMON FEATURES:
+
+* Filters:
+
+  * status
+  * branch
+  * month
+  * commodity
+
+* Table UI:
+
+  * pagination
+  * sorting
+
+* Bill Approval UI:
+
+  * Show original vs edited
+  * Highlight changed fields
+
+* Notifications dropdown
+
+---
+
+API DESIGN:
+
+Use REST structure:
+
+/api/v1/auth/
+/api/v1/users/
+/api/v1/bills/
+/api/v1/commodities/
+/api/v1/depositors/
+/api/v1/approvals/
+/api/v1/notifications/
+
+---
+
+SCALABILITY PRACTICES:
+
+* Use environment variables
+
+* Separate service layer
+
+* Use async DB queries
+
+* Proper indexing on:
+
+  * serial_no
+  * status
+  * created_by
+  * commodity_id
+
+* Keep code modular
+
+---
+
+BONUS (IF TIME):
+
+* Docker setup
+* Background task for email (Celery or FastAPI BackgroundTasks)
+* Redis for notifications (optional)
+
+---
+
+FINAL OUTPUT:
+
+* Fully working backend + frontend
+* Clean folder structure
+* Ready to deploy
+* Seed script for demo data
+
+---
+
+IMPORTANT:
+
+Focus on:
+
+* Clean architecture
+* Approval workflows
+* Versioning system
+* Maintainability over quick hacks
+
+---
