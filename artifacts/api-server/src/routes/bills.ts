@@ -45,8 +45,26 @@ async function buildBillDetail(bill: typeof billsTable.$inferSelect) {
   };
 }
 
+router.get("/v1/bills/filter-options", authMiddleware, async (req, res): Promise<void> => {
+  let bills = await db.select().from(billsTable);
+
+  if (req.user!.role === "operator") {
+    bills = bills.filter((b) => b.created_by === req.user!.id);
+  }
+
+  const unique = <T>(arr: (T | null | undefined)[]) =>
+    [...new Set(arr.filter((x): x is T => x != null && x !== ""))].sort() as T[];
+
+  res.json({
+    districts: unique(bills.map((b) => b.district)),
+    branch_names: unique(bills.map((b) => b.branch_name)),
+    financial_years: unique(bills.map((b) => b.financial_year)),
+    month_years: unique(bills.map((b) => b.month_year)),
+  });
+});
+
 router.get("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
-  const { status, branch_name, month_year, commodity_id, created_by, page = "1", limit = "20" } = req.query as Record<string, string>;
+  const { status, district, branch_name, financial_year, month_year, commodity_id, created_by, page = "1", limit = "20" } = req.query as Record<string, string>;
 
   const pageNum = parseInt(page, 10) || 1;
   const limitNum = parseInt(limit, 10) || 20;
@@ -60,7 +78,9 @@ router.get("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
   }
 
   if (status) bills = bills.filter((b) => b.status === status);
-  if (branch_name) bills = bills.filter((b) => b.branch_name?.toLowerCase().includes(branch_name.toLowerCase()));
+  if (district) bills = bills.filter((b) => b.district === district);
+  if (branch_name) bills = bills.filter((b) => b.branch_name === branch_name);
+  if (financial_year) bills = bills.filter((b) => b.financial_year === financial_year);
   if (month_year) bills = bills.filter((b) => b.month_year === month_year);
   if (commodity_id) bills = bills.filter((b) => b.commodity_id === parseInt(commodity_id, 10));
   if (created_by && req.user!.role === "admin") bills = bills.filter((b) => b.created_by === parseInt(created_by, 10));
