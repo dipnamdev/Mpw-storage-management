@@ -7,14 +7,13 @@ import {
   Package,
   Users,
   Building2,
-  ClipboardCheck,
   GitBranch,
   Bell,
   User,
   LogOut,
   Menu,
   X,
-  ChevronDown,
+  PlusCircle,
 } from "lucide-react";
 import { useListNotifications, useMarkAllNotificationsRead, getListNotificationsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -26,11 +25,13 @@ interface NavItem {
   href: string;
   icon: React.ComponentType<{ className?: string }>;
   adminOnly?: boolean;
+  operatorOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, adminOnly: true },
-  { label: "Bills", href: "/bills", icon: FileText },
+  { label: "View Bills", href: "/bills", icon: FileText },
+  { label: "Add Bill", href: "/bills/new", icon: PlusCircle, operatorOnly: true },
   { label: "Commodities", href: "/commodities", icon: Package, adminOnly: true },
   { label: "Depositors", href: "/depositors", icon: Building2, adminOnly: true },
   { label: "Users", href: "/users", icon: Users, adminOnly: true },
@@ -40,7 +41,7 @@ const navItems: NavItem[] = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth();
-  const [location] = useLocation();
+  const [location, navigate] = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const queryClient = useQueryClient();
@@ -51,9 +52,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
   const markAllRead = useMarkAllNotificationsRead();
 
-  const filteredNav = navItems.filter((item) =>
-    !item.adminOnly || user?.role === "admin"
-  );
+  const filteredNav = navItems.filter((item) => {
+    if (item.adminOnly) return user?.role === "admin";
+    if (item.operatorOnly) return user?.role === "operator";
+    return true;
+  });
 
   const unreadCount = notifications.length;
 
@@ -63,6 +66,21 @@ export function Layout({ children }: { children: React.ReactNode }) {
         queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey({ unread_only: true }) });
       },
     });
+  };
+
+  const handleNotifClick = (n: any) => {
+    setNotifOpen(false);
+    // Mark this notification read and navigate
+    const token = localStorage.getItem("mpw_token");
+    fetch(`/api/v1/notifications/${n.id}/read`, {
+      method: "PATCH",
+      headers: { Authorization: `Bearer ${token}` },
+    }).then(() => {
+      queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey({ unread_only: true }) });
+    });
+    if (n.link_url) {
+      navigate(n.link_url);
+    }
   };
 
   return (
@@ -99,7 +117,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 overflow-y-auto">
           {filteredNav.map((item) => {
-            const isActive = location === item.href || location.startsWith(item.href + "/");
+            const isActive = location === item.href ||
+              (item.href !== "/bills/new" && item.href !== "/bills" && location.startsWith(item.href + "/")) ||
+              (item.href === "/bills" && location === "/bills") ||
+              (item.href === "/bills/new" && location === "/bills/new");
             return (
               <Link
                 key={item.href}
@@ -170,34 +191,48 @@ export function Layout({ children }: { children: React.ReactNode }) {
             </button>
 
             {notifOpen && (
-              <div className="absolute right-0 top-12 w-80 bg-card border border-border rounded-lg shadow-lg z-50">
-                <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-                  <span className="text-sm font-semibold">Notifications</span>
-                  {unreadCount > 0 && (
-                    <button
-                      onClick={handleMarkAllRead}
-                      className="text-xs text-primary hover:underline"
-                    >
-                      Mark all read
-                    </button>
-                  )}
-                </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {notifications.length === 0 ? (
-                    <div className="px-4 py-8 text-center text-sm text-muted-foreground">
-                      No new notifications
-                    </div>
-                  ) : (
-                    notifications.map((n) => (
-                      <div key={n.id} className="px-4 py-3 border-b border-border last:border-0 hover:bg-muted/50">
-                        <div className="text-sm font-medium">{n.title}</div>
-                        <div className="text-xs text-muted-foreground mt-0.5">{n.message}</div>
-                        <div className="text-xs text-muted-foreground mt-1">{formatDateTime(n.created_at)}</div>
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setNotifOpen(false)} />
+                <div className="absolute right-0 top-12 w-80 bg-card border border-border rounded-lg shadow-lg z-50">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+                    <span className="text-sm font-semibold">Notifications</span>
+                    {unreadCount > 0 && (
+                      <button onClick={handleMarkAllRead} className="text-xs text-primary hover:underline">
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {notifications.length === 0 ? (
+                      <div className="px-4 py-8 text-center text-sm text-muted-foreground">
+                        No new notifications
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      notifications.map((n) => (
+                        <div
+                          key={n.id}
+                          onClick={() => handleNotifClick(n)}
+                          className={cn(
+                            "px-4 py-3 border-b border-border last:border-0 hover:bg-muted/50 transition-colors",
+                            (n as any).link_url ? "cursor-pointer" : "cursor-default"
+                          )}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="text-sm font-medium">{n.title}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{n.message}</div>
+                              <div className="text-xs text-muted-foreground mt-1">{formatDateTime(n.created_at)}</div>
+                            </div>
+                            {(n as any).link_url && (
+                              <span className="text-xs text-primary mt-0.5 flex-shrink-0">View →</span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
+              </>
             )}
           </div>
         </header>

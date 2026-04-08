@@ -4,6 +4,7 @@ import { useGetBill, useListCommodities, useRequestBillEdit, getGetBillQueryKey 
 import { Layout } from "@/components/Layout";
 import { ArrowLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { MONTH_NAMES, getFinancialYearOptions, getYearOptions, joinMonthYear, splitMonthYear } from "@/lib/date-options";
 import { MP_DISTRICTS } from "@/lib/districts";
 import { SearchableSelect } from "@/components/SearchableSelect";
@@ -24,6 +25,7 @@ export default function RequestEditPage() {
   const { data: commodities = [] } = useListCommodities();
   const editMutation = useRequestBillEdit();
   const [error, setError] = useState("");
+  const { toast } = useToast();
 
   const [form, setForm] = useState({
     district: "",
@@ -115,6 +117,7 @@ export default function RequestEditPage() {
     try {
       await editMutation.mutateAsync({ id, data: changes as any });
       queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
+      toast({ title: "Edit request submitted", description: "Your changes are pending admin approval." });
       navigate(`/bills/${id}`);
     } catch {
       setError("Failed to submit edit request");

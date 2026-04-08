@@ -3,6 +3,7 @@ import { useListUsers, useCreateUser, getListUsersQueryKey } from "@workspace/ap
 import { Layout } from "@/components/Layout";
 import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/lib/utils";
 import { MP_DISTRICTS } from "@/lib/districts";
 import { SearchableSelect } from "@/components/SearchableSelect";
@@ -13,6 +14,7 @@ export default function UsersPage() {
   const createMutation = useCreateUser();
   const queryClient = useQueryClient();
 
+  const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({
     name: "", email: "", password: "",
@@ -46,6 +48,7 @@ export default function UsersPage() {
       setForm({ name: "", email: "", password: "", role: "operator", branch_name: "", district_name: "", mobile_number: "" });
       setShowAdd(false);
       setError("");
+      toast({ title: "User created", description: `${form.name} has been added as ${form.role}.` });
     } catch {
       setError("Failed to create user. Email may already exist.");
     }
@@ -67,6 +70,7 @@ export default function UsersPage() {
       if (!res.ok) throw new Error();
       queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
       setEditId(null);
+      toast({ title: "User updated" });
     } catch {
       setError("Failed to update user");
     }
@@ -86,6 +90,7 @@ export default function UsersPage() {
       }
       queryClient.invalidateQueries({ queryKey: getListUsersQueryKey() });
       setDeleteConfirmId(null);
+      toast({ title: "User deleted" });
     } catch {
       setError("Failed to delete user");
     }

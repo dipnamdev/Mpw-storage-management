@@ -164,6 +164,7 @@ router.post("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
       title: "New Bill Created",
       message: `A new bill (serial #${bill.serial_no}) has been submitted by ${req.user!.name} and is pending review.`,
       type: "web",
+      link_url: `/bills/${bill.id}`,
     });
   }
 
@@ -252,6 +253,7 @@ router.post("/v1/bills/:id/request-edit", authMiddleware, async (req, res): Prom
       title: "Edit Request Submitted",
       message: `An edit request has been submitted for Bill #${bill.serial_no} by ${req.user!.name}.`,
       type: "web",
+      link_url: `/versions`,
     });
   }
 
@@ -304,6 +306,7 @@ router.post("/v1/bills/:id/request-delete", authMiddleware, async (req, res): Pr
       title: "Delete Request Submitted",
       message: `A delete request has been submitted for Bill #${bill.serial_no} by ${req.user!.name}.`,
       type: "web",
+      link_url: `/versions`,
     });
   }
 

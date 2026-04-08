@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/auth";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
 import { ArrowLeft, Edit, Trash2, CheckCircle, Lock, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function BillDetailPage() {
   const [, params] = useRoute("/bills/:id");
@@ -18,6 +19,7 @@ export default function BillDetailPage() {
   const { data: bill, isLoading } = useGetBill(id, { query: { enabled: !!id } });
   const { data: depositors = [] } = useListDepositors();
 
+  const { toast } = useToast();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -42,7 +44,7 @@ export default function BillDetailPage() {
       queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
       setShowDeleteDialog(false);
       setDeleteReason("");
-      alert("Delete request submitted for admin approval");
+      toast({ title: "Delete request submitted", description: "Your request is pending admin approval." });
     } catch {
       setDeleteError("Failed to submit delete request");
     } finally {

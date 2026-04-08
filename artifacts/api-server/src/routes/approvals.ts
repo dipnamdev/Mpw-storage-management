@@ -101,6 +101,7 @@ router.post("/v1/approvals/approve/:billId", authMiddleware, requireAdmin, async
     title: "Bill Approved",
     message: `Your bill (serial #${bill.serial_no}) has been approved. Pass amount: ${pass_amount}.`,
     type: "web",
+    link_url: `/bills/${billId}`,
   });
 
   // Return updated bill detail
@@ -148,6 +149,7 @@ router.post("/v1/approvals/reject/:billId", authMiddleware, requireAdmin, async 
     title: "Bill Rejected",
     message: `Your bill (serial #${bill.serial_no}) has been rejected. Reason: ${reason}`,
     type: "web",
+    link_url: `/bills/${billId}`,
   });
 
   const [updatedBill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
@@ -226,6 +228,7 @@ router.post("/v1/approvals/versions/:versionId/approve", authMiddleware, require
     title: version.version_type === "edit" ? "Edit Request Approved" : "Delete Request Approved",
     message: `Your ${version.version_type} request for Bill #${bill?.serial_no} has been approved.`,
     type: "web",
+    link_url: bill ? `/bills/${bill.id}` : `/bills`,
   });
 
   const [updatedVersion] = await db.select().from(billVersionsTable).where(eq(billVersionsTable.id, versionId));
@@ -265,6 +268,7 @@ router.post("/v1/approvals/versions/:versionId/reject", authMiddleware, requireA
     title: version.version_type === "edit" ? "Edit Request Rejected" : "Delete Request Rejected",
     message: `Your ${version.version_type} request for Bill #${bill?.serial_no} has been rejected. ${reason ? "Reason: " + reason : ""}`,
     type: "web",
+    link_url: bill ? `/bills/${bill.id}` : `/bills`,
   });
 
   const [updatedVersion] = await db.select().from(billVersionsTable).where(eq(billVersionsTable.id, versionId));

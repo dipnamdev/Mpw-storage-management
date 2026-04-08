@@ -5,6 +5,7 @@ import { Layout } from "@/components/Layout";
 import { ArrowLeft, Upload, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatCurrency } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 
 export default function ApproveBillPage() {
   const [, params] = useRoute("/bills/:id/approve");
@@ -30,6 +31,7 @@ export default function ApproveBillPage() {
   const [showReject, setShowReject] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const { toast } = useToast();
 
   // Pre-fill depositor from the bill (operator already selected it)
   useEffect(() => {
@@ -73,6 +75,7 @@ export default function ApproveBillPage() {
       });
       queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
       queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() });
+      toast({ title: "Bill approved", description: `Bill #${bill?.serial_no} has been approved successfully.` });
       navigate(`/bills/${id}`);
     } catch {
       setError("Failed to approve bill");
@@ -91,6 +94,7 @@ export default function ApproveBillPage() {
       });
       queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
       queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() });
+      toast({ title: "Bill rejected", description: `Bill #${bill?.serial_no} has been rejected.` });
       navigate(`/bills/${id}`);
     } catch {
       setError("Failed to reject bill");

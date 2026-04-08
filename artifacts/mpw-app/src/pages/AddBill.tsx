@@ -9,6 +9,7 @@ import { MONTH_SHORT, MONTH_FULL, getFinancialYearOptions, getYearOptions, joinM
 import { MP_DISTRICTS } from "@/lib/districts";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
 
 const FY_OPTIONS = getFinancialYearOptions();
 const YEAR_OPTIONS = getYearOptions();
@@ -62,6 +63,7 @@ export default function AddBillPage() {
   const [error, setError] = useState("");
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
 
   const { data: commodities = [] } = useListCommodities();
   const { data: depositors = [] } = useListDepositors();
@@ -146,6 +148,7 @@ export default function AddBillPage() {
         } as any,
       });
       queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() });
+      toast({ title: "Bill submitted successfully", description: `Your bill has been submitted and is pending admin review.` });
       navigate(`/bills/${result.id}`);
     } catch {
       setError("Failed to create bill. Please check all fields.");

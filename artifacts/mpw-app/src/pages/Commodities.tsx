@@ -3,6 +3,7 @@ import { useListCommodities, useCreateCommodity, useUpdateCommodity, getListComm
 import { Layout } from "@/components/Layout";
 import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function CommoditiesPage() {
   const { data: rawCommodities = [], isLoading } = useListCommodities();
@@ -11,6 +12,7 @@ export default function CommoditiesPage() {
   const updateMutation = useUpdateCommodity();
   const queryClient = useQueryClient();
 
+  const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [editId, setEditId] = useState<number | null>(null);
   const [form, setForm] = useState({ crop_name: "", crop_year: "", per_bag_per_month: "" });
@@ -32,6 +34,7 @@ export default function CommoditiesPage() {
       setForm({ crop_name: "", crop_year: "", per_bag_per_month: "" });
       setShowAdd(false);
       setError("");
+      toast({ title: "Commodity added", description: `${form.crop_name} (${form.crop_year}) has been added.` });
     } catch {
       setError("Failed to create. Crop+year combination may already exist.");
     }
@@ -49,6 +52,7 @@ export default function CommoditiesPage() {
       });
       queryClient.invalidateQueries({ queryKey: getListCommoditiesQueryKey() });
       setEditId(null);
+      toast({ title: "Commodity updated" });
     } catch {
       setError("Failed to update commodity");
     }
@@ -68,6 +72,7 @@ export default function CommoditiesPage() {
       }
       queryClient.invalidateQueries({ queryKey: getListCommoditiesQueryKey() });
       setDeleteConfirmId(null);
+      toast({ title: "Commodity deleted" });
     } catch {
       setError("Failed to delete commodity");
     }

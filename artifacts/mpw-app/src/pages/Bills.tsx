@@ -6,7 +6,7 @@ import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight, Clock, AlertCircle } from "lucide-react";
 import { MP_DISTRICTS } from "@/lib/districts";
 
 interface FilterOptions {
@@ -45,7 +45,7 @@ export default function BillsPage() {
   const [depositorId, setDepositorId] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data: filterOptions, refetch: refetchOptions } = useFilterOptions();
+  const { data: filterOptions } = useFilterOptions();
   const { data: commodities = [] } = useListCommodities();
 
   const { data, isLoading } = useListBills({
@@ -60,19 +60,42 @@ export default function BillsPage() {
     limit: 20,
   } as any);
 
+  // Pending bills summary — always fetches all pending bills regardless of filter
+  const { data: pendingData } = useListBills({ status: "pending", limit: 1000 } as any);
+  const pendingBills = pendingData?.bills ?? [];
+  const pendingCount = pendingData?.total ?? 0;
+  const pendingTotal = pendingBills.reduce((sum: number, b: any) => sum + (parseFloat(b.total_charge) || 0), 0);
+
   const bills = data?.bills ?? [];
   const totalPages = data?.total_pages ?? 1;
   const total = data?.total ?? 0;
 
-  const handleExport = () => {
+  const handleExport = async () => {
     const params = new URLSearchParams();
     if (status) params.set("status", status);
     if (district) params.set("district", district);
     if (branchName) params.set("branch_name", branchName);
     if (financialYear) params.set("financial_year", financialYear);
     if (monthYear) params.set("month_year", monthYear);
+
     const token = localStorage.getItem("mpw_token");
-    window.open(`/api/v1/bills/export?${params}&token=${token}`, "_blank");
+    try {
+      const res = await fetch(`/api/v1/bills/export?${params}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error("Export failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `bills-export-${new Date().toISOString().split("T")[0]}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      alert("Export failed. Please try again.");
+    }
   };
 
   const resetFilters = () => {
@@ -114,6 +137,28 @@ export default function BillsPage() {
           </div>
         </div>
 
+        {/* Pending summary stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <Clock className="w-5 h-5 text-amber-600" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-amber-800">{pendingCount}</div>
+              <div className="text-xs text-amber-600 font-medium">Total Pending Bills</div>
+            </div>
+          </div>
+          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center gap-3">
+            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <AlertCircle className="w-5 h-5 text-orange-600" />
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-orange-800">{formatCurrency(pendingTotal)}</div>
+              <div className="text-xs text-orange-600 font-medium">Total Pending Amount</div>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-3">
           <div className="flex items-center justify-between">
@@ -123,7 +168,6 @@ export default function BillsPage() {
             )}
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {/* Row 1 */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Status</label>
               <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass}>
@@ -133,7 +177,6 @@ export default function BillsPage() {
                 <option value="rejected">Rejected</option>
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-muted-foreground mb-1">District</label>
               <select value={district} onChange={(e) => { setDistrict(e.target.value); setPage(1); }} className={selectClass}>
@@ -143,7 +186,6 @@ export default function BillsPage() {
                 ))}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Branch Name</label>
               <select value={branchName} onChange={(e) => { setBranchName(e.target.value); setPage(1); }} className={selectClass}>
@@ -153,7 +195,6 @@ export default function BillsPage() {
                 ))}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Financial Year</label>
               <select value={financialYear} onChange={(e) => { setFinancialYear(e.target.value); setPage(1); }} className={selectClass}>
@@ -163,8 +204,6 @@ export default function BillsPage() {
                 ))}
               </select>
             </div>
-
-            {/* Row 2 */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Month</label>
               <select value={monthYear} onChange={(e) => { setMonthYear(e.target.value); setPage(1); }} className={selectClass}>
@@ -174,7 +213,6 @@ export default function BillsPage() {
                 ))}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Commodity</label>
               <select value={commodityId} onChange={(e) => { setCommodityId(e.target.value); setPage(1); }} className={selectClass}>
@@ -184,7 +222,6 @@ export default function BillsPage() {
                 ))}
               </select>
             </div>
-
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Depositor</label>
               <select value={depositorId} onChange={(e) => { setDepositorId(e.target.value); setPage(1); }} className={selectClass}>
@@ -257,7 +294,6 @@ export default function BillsPage() {
             </table>
           </div>
 
-          {/* Pagination */}
           {totalPages > 1 && (
             <div className="flex items-center justify-between px-4 py-3 border-t border-border">
               <div className="text-sm text-muted-foreground">

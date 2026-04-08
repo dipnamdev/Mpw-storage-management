@@ -3,6 +3,7 @@ import { useListDepositors, useCreateDepositor, getListDepositorsQueryKey } from
 import { Layout } from "@/components/Layout";
 import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 export default function DepositorsPage() {
   const { data: rawDepositors = [], isLoading } = useListDepositors();
@@ -10,6 +11,7 @@ export default function DepositorsPage() {
   const createMutation = useCreateDepositor();
   const queryClient = useQueryClient();
 
+  const { toast } = useToast();
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: "", gst_no: "", total_gst: "" });
   const [error, setError] = useState("");
@@ -35,6 +37,7 @@ export default function DepositorsPage() {
       setForm({ name: "", gst_no: "", total_gst: "" });
       setShowAdd(false);
       setError("");
+      toast({ title: "Depositor added", description: `${form.name} has been added successfully.` });
     } catch {
       setError("Failed to create depositor");
     }
@@ -55,6 +58,7 @@ export default function DepositorsPage() {
       if (!res.ok) throw new Error();
       queryClient.invalidateQueries({ queryKey: getListDepositorsQueryKey() });
       setEditId(null);
+      toast({ title: "Depositor updated" });
     } catch {
       setError("Failed to update depositor");
     }
@@ -70,6 +74,7 @@ export default function DepositorsPage() {
       if (!res.ok) throw new Error();
       queryClient.invalidateQueries({ queryKey: getListDepositorsQueryKey() });
       setDeleteConfirmId(null);
+      toast({ title: "Depositor deleted" });
     } catch {
       setError("Failed to delete depositor");
     }
