@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useLogin } from "@workspace/api-client-react";
 import { useAuth } from "@/lib/auth";
-import { Building2, Lock, Mail } from "lucide-react";
+import { Building2, Mail } from "lucide-react";
+import { PasswordInput } from "@/components/PasswordInput";
+import { Lock } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -23,7 +25,7 @@ export default function LoginPage() {
       } else {
         navigate("/bills");
       }
-    } catch (err: unknown) {
+    } catch {
       setError("Invalid email or password");
     }
   };
@@ -103,17 +105,13 @@ export default function LoginPage() {
 
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  className="w-full pl-10 pr-4 py-2.5 rounded-lg border border-border bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors"
-                />
-              </div>
+              <PasswordInput
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                leftIcon={<Lock className="w-4 h-4" />}
+              />
             </div>
 
             {error && (

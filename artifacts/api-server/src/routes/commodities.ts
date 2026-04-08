@@ -62,4 +62,16 @@ router.patch("/v1/commodities/:id", authMiddleware, requireAdmin, async (req, re
   res.json({ ...commodity, per_bag_per_month: parseFloat(commodity.per_bag_per_month) });
 });
 
+router.delete("/v1/commodities/:id", authMiddleware, requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const deleted = await db.delete(commoditiesTable).where(eq(commoditiesTable.id, id)).returning();
+  if (!deleted.length) {
+    res.status(404).json({ error: "Commodity not found" });
+    return;
+  }
+  res.json({ success: true });
+});
+
 export default router;

@@ -45,4 +45,38 @@ router.get("/v1/depositors/:id", authMiddleware, async (req, res): Promise<void>
   res.json(sanitizeDepositor(depositor));
 });
 
+router.patch("/v1/depositors/:id", authMiddleware, requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+  const { name, gst_no, total_gst } = req.body;
+
+  const [depositor] = await db
+    .update(depositorsTable)
+    .set({
+      ...(name !== undefined && { name }),
+      ...(gst_no !== undefined && { gst_no }),
+      ...(total_gst !== undefined && { total_gst: total_gst != null ? String(total_gst) : null }),
+    })
+    .where(eq(depositorsTable.id, id))
+    .returning();
+
+  if (!depositor) {
+    res.status(404).json({ error: "Depositor not found" });
+    return;
+  }
+  res.json(sanitizeDepositor(depositor));
+});
+
+router.delete("/v1/depositors/:id", authMiddleware, requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  const deleted = await db.delete(depositorsTable).where(eq(depositorsTable.id, id)).returning();
+  if (!deleted.length) {
+    res.status(404).json({ error: "Depositor not found" });
+    return;
+  }
+  res.json({ success: true });
+});
+
 export default router;

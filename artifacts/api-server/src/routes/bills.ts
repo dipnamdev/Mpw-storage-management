@@ -284,11 +284,12 @@ router.post("/v1/bills/:id/request-delete", authMiddleware, async (req, res): Pr
     return;
   }
 
+  const { reason } = req.body;
   const [version] = await db
     .insert(billVersionsTable)
     .values({
       bill_id: id,
-      data_json: JSON.stringify({}),
+      data_json: JSON.stringify({ reason: reason ?? "" }),
       version_type: "delete",
       status: "pending",
       created_by: req.user!.id,

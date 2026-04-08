@@ -93,4 +93,21 @@ router.patch("/v1/users/:id", authMiddleware, async (req, res): Promise<void> =>
   res.json(sanitizeUser(user));
 });
 
+router.delete("/v1/users/:id", authMiddleware, requireAdmin, async (req, res): Promise<void> => {
+  const raw = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+  const id = parseInt(raw, 10);
+
+  if (req.user!.id === id) {
+    res.status(400).json({ error: "Cannot delete your own account" });
+    return;
+  }
+
+  const deleted = await db.delete(usersTable).where(eq(usersTable.id, id)).returning();
+  if (!deleted.length) {
+    res.status(404).json({ error: "User not found" });
+    return;
+  }
+  res.json({ success: true });
+});
+
 export default router;

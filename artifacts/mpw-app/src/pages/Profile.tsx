@@ -4,6 +4,7 @@ import { useAuth } from "@/lib/auth";
 import { Layout } from "@/components/Layout";
 import { useQueryClient } from "@tanstack/react-query";
 import { User, Lock } from "lucide-react";
+import { PasswordInput } from "@/components/PasswordInput";
 
 export default function ProfilePage() {
   const { user } = useAuth();
@@ -29,10 +30,7 @@ export default function ProfilePage() {
     e.preventDefault();
     setProfileError(""); setProfileMsg("");
     try {
-      await updateMutation.mutateAsync({
-        id: user!.id,
-        data: profileForm,
-      });
+      await updateMutation.mutateAsync({ id: user!.id, data: profileForm });
       queryClient.invalidateQueries({ queryKey: getGetMeQueryKey() });
       setProfileMsg("Profile updated successfully");
     } catch {
@@ -122,15 +120,27 @@ export default function ProfilePage() {
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium mb-1.5">Current Password</label>
-              <input type="password" value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} className={inputClass} />
+              <PasswordInput
+                value={passwordForm.current_password}
+                onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })}
+                placeholder="Current password"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">New Password</label>
-              <input type="password" value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} className={inputClass} />
+              <PasswordInput
+                value={passwordForm.new_password}
+                onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })}
+                placeholder="New password"
+              />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1.5">Confirm New Password</label>
-              <input type="password" value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} className={inputClass} />
+              <PasswordInput
+                value={passwordForm.confirm_password}
+                onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })}
+                placeholder="Confirm new password"
+              />
             </div>
           </div>
 

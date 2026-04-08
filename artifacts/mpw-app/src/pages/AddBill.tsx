@@ -5,7 +5,7 @@ import { Layout } from "@/components/Layout";
 import { ArrowLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { MONTH_NAMES, getFinancialYearOptions, getYearOptions, joinMonthYear } from "@/lib/date-options";
+import { MONTH_SHORT, MONTH_FULL, getFinancialYearOptions, getYearOptions, joinMonthYear } from "@/lib/date-options";
 import { MP_DISTRICTS } from "@/lib/districts";
 import { SearchableSelect } from "@/components/SearchableSelect";
 import { useAuth } from "@/lib/auth";
@@ -58,6 +58,7 @@ export default function AddBillPage() {
   });
 
   const [totalCharge, setTotalCharge] = useState<number | null>(null);
+  const [gstAmount, setGstAmount] = useState<number | null>(null);
   const [error, setError] = useState("");
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
@@ -66,7 +67,6 @@ export default function AddBillPage() {
   const { data: depositors = [] } = useListDepositors();
   const createBill = useCreateBill();
 
-  // When user profile loads, update district/branch
   useEffect(() => {
     if (isOperator && user) {
       setForm((prev) => ({
@@ -77,7 +77,7 @@ export default function AddBillPage() {
     }
   }, [user]);
 
-  // Auto-fill crop_year and rate_per_bag when commodity changes
+  // Auto-fill crop_year and rate_per_bag from selected commodity
   useEffect(() => {
     const commodity = commodities.find((c) => c.id === parseInt(form.commodity_id));
     if (commodity) {
@@ -89,16 +89,25 @@ export default function AddBillPage() {
     }
   }, [form.commodity_id, commodities]);
 
-  // Auto-calculate total charge
+  // Calculate total charge and GST
   useEffect(() => {
     const commodity = commodities.find((c) => c.id === parseInt(form.commodity_id));
     const received = parseInt(form.received_bags);
     if (commodity && !isNaN(received)) {
-      setTotalCharge((received * commodity.per_bag_per_month) / 2);
+      const charge = (received * commodity.per_bag_per_month) / 2;
+      setTotalCharge(charge);
+
+      const depositor = depositors.find((d) => d.id === parseInt(form.depositor_id));
+      if (depositor && depositor.total_gst != null) {
+        setGstAmount((charge * depositor.total_gst) / 100);
+      } else {
+        setGstAmount(null);
+      }
     } else {
       setTotalCharge(null);
+      setGstAmount(null);
     }
-  }, [form.commodity_id, form.received_bags, commodities]);
+  }, [form.commodity_id, form.received_bags, form.depositor_id, commodities, depositors]);
 
   const set = (field: keyof BillForm) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -145,6 +154,10 @@ export default function AddBillPage() {
 
   const inputClass = "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors";
   const lockedClass = "w-full px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm text-muted-foreground cursor-not-allowed";
+  const readonlyClass = "w-full px-3 py-2 rounded-lg border border-border bg-muted/30 text-sm font-medium text-foreground cursor-default";
+
+  const selectedDepositor = depositors.find((d) => d.id === parseInt(form.depositor_id));
+  const grandTotal = totalCharge != null && gstAmount != null ? totalCharge + gstAmount : totalCharge;
 
   return (
     <Layout>
@@ -160,7 +173,7 @@ export default function AddBillPage() {
 
         {isOperator && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
-            Your district and branch are pre-filled from your account profile and cannot be changed.
+            Your district and branch are pre-filled from your account and cannot be changed.
           </div>
         )}
 
@@ -186,7 +199,9 @@ export default function AddBillPage() {
             <select value={form.depositor_id} onChange={set("depositor_id")} className={inputClass}>
               <option value="">Select depositor...</option>
               {depositors.map((d) => (
-                <option key={d.id} value={d.id}>{d.name}{d.gst_no ? ` (${d.gst_no})` : ""}</option>
+                <option key={d.id} value={d.id}>
+                  {d.name}{d.gst_no ? ` (${d.gst_no})` : ""}{d.total_gst != null ? ` — GST ${d.total_gst}%` : ""}
+                </option>
               ))}
             </select>
           </div>
@@ -197,33 +212,22 @@ export default function AddBillPage() {
               <input value={form.bill_no} onChange={set("bill_no")} placeholder="e.g. BPL-001" className={inputClass} />
             </div>
 
-            {/* District — searchable, locked for operators */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">District</label>
               {isOperator ? (
                 <div className={lockedClass}>{form.district || "—"}</div>
               ) : (
-                <SearchableSelect
-                  options={MP_DISTRICTS}
-                  value={form.district}
-                  onChange={(v) => setForm((prev) => ({ ...prev, district: v }))}
-                  placeholder="Select district..."
-                />
+                <SearchableSelect options={MP_DISTRICTS} value={form.district}
+                  onChange={(v) => setForm((prev) => ({ ...prev, district: v }))} placeholder="Select district..." />
               )}
             </div>
 
-            {/* Branch — locked for operators */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Branch Name</label>
               {isOperator ? (
                 <div className={lockedClass}>{form.branch_name || "—"}</div>
               ) : (
-                <input
-                  value={form.branch_name}
-                  onChange={set("branch_name")}
-                  placeholder="BRANCH NAME (uppercase)"
-                  className={inputClass + " uppercase"}
-                />
+                <input value={form.branch_name} onChange={set("branch_name")} placeholder="BRANCH NAME (uppercase)" className={inputClass + " uppercase"} />
               )}
             </div>
 
@@ -252,12 +256,15 @@ export default function AddBillPage() {
                 className={inputClass + (form.commodity_id ? " bg-muted/30" : "")} />
             </div>
 
+            {/* Month-Year — full month names displayed, short stored */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Month-Year</label>
               <div className="flex gap-2">
                 <select value={form.month} onChange={set("month")} className={inputClass}>
-                  <option value="">Month</option>
-                  {MONTH_NAMES.map((m) => <option key={m} value={m}>{m}</option>)}
+                  <option value="">Select Month</option>
+                  {MONTH_SHORT.map((short, i) => (
+                    <option key={short} value={short}>{MONTH_FULL[i]}</option>
+                  ))}
                 </select>
                 <select value={form.month_year_year} onChange={set("month_year_year")} className={inputClass}>
                   {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
@@ -291,12 +298,30 @@ export default function AddBillPage() {
             </div>
           </div>
 
+          {/* Charge summary */}
           {totalCharge !== null && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="text-sm text-green-700">
-                <span className="font-medium">Calculated Total Charge: </span>
-                ₹{totalCharge.toFixed(2)}
-                <span className="text-xs ml-2 opacity-70">(received_bags × per_bag_per_month ÷ 2)</span>
+            <div className="border-t border-border pt-4 space-y-2">
+              <h3 className="text-sm font-semibold text-foreground mb-3">Charge Summary</h3>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1.5">Total Charge (₹)</label>
+                  <div className={readonlyClass}>₹{totalCharge.toFixed(2)}</div>
+                  <p className="text-xs text-muted-foreground mt-1">received_bags × rate ÷ 2</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1.5">
+                    GST Amount {selectedDepositor?.total_gst != null ? `(${selectedDepositor.total_gst}%)` : ""} (₹)
+                  </label>
+                  <div className={readonlyClass}>
+                    {gstAmount != null ? `₹${gstAmount.toFixed(2)}` : (form.depositor_id ? "—" : "Select depositor")}
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1.5">Grand Total (₹)</label>
+                  <div className={readonlyClass + " text-green-700 font-semibold"}>
+                    ₹{(grandTotal ?? totalCharge).toFixed(2)}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -304,11 +329,8 @@ export default function AddBillPage() {
           {error && <div className="bg-destructive/10 text-destructive text-sm px-3 py-2.5 rounded-lg">{error}</div>}
 
           <div className="flex gap-3 pt-2">
-            <button
-              type="submit"
-              disabled={createBill.isPending}
-              className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60"
-            >
+            <button type="submit" disabled={createBill.isPending}
+              className="px-6 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors disabled:opacity-60">
               {createBill.isPending ? "Submitting..." : "Submit Bill"}
             </button>
             <Link href="/bills">

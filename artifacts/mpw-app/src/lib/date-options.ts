@@ -1,6 +1,11 @@
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+export const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-export const MONTH_NAMES = MONTHS;
+export const MONTH_FULL = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+];
+
+export const MONTH_NAMES = MONTH_SHORT;
 
 export function getYearOptions(): string[] {
   const currentYear = new Date().getFullYear();
@@ -32,4 +37,14 @@ export function splitMonthYear(monthYear: string): { month: string; year: string
 export function joinMonthYear(month: string, year: string): string {
   if (!month || !year) return "";
   return `${month}-${year}`;
+}
+
+export function shortToFull(short: string): string {
+  const idx = MONTH_SHORT.indexOf(short);
+  return idx >= 0 ? MONTH_FULL[idx] : short;
+}
+
+export function fullToShort(full: string): string {
+  const idx = MONTH_FULL.indexOf(full);
+  return idx >= 0 ? MONTH_SHORT[idx] : full;
 }

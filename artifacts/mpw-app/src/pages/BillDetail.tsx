@@ -1,21 +1,54 @@
+import { useState } from "react";
 import { useRoute, Link, useLocation } from "wouter";
-import { useGetBill, useRejectBill, getListBillsQueryKey, getGetBillQueryKey } from "@workspace/api-client-react";
+import { useGetBill, useListDepositors, getListBillsQueryKey, getGetBillQueryKey } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, formatDate, formatDateTime } from "@/lib/utils";
-import { ArrowLeft, Edit, Trash2, CheckCircle, Lock } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, CheckCircle, Lock, X } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 export default function BillDetailPage() {
-  const [match, params] = useRoute("/bills/:id");
+  const [, params] = useRoute("/bills/:id");
   const id = params?.id ? parseInt(params.id) : 0;
   const { user } = useAuth();
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
   const { data: bill, isLoading } = useGetBill(id, { query: { enabled: !!id } });
-  const rejectMutation = useRejectBill();
+  const { data: depositors = [] } = useListDepositors();
+
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const handleRequestDelete = async () => {
+    if (!deleteReason.trim()) {
+      setDeleteError("Please provide a reason for deletion");
+      return;
+    }
+    setDeleteLoading(true);
+    setDeleteError("");
+    try {
+      await fetch(`/api/v1/bills/${id}/request-delete`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("mpw_token")}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ reason: deleteReason }),
+      });
+      queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
+      setShowDeleteDialog(false);
+      setDeleteReason("");
+      alert("Delete request submitted for admin approval");
+    } catch {
+      setDeleteError("Failed to submit delete request");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -35,14 +68,16 @@ export default function BillDetailPage() {
     );
   }
 
+  const operatorDepositor = depositors.find((d) => d.id === (bill as any).depositor_id);
+
   const fields = [
     { label: "Serial No", value: `#${bill.serial_no}` },
     { label: "Bill No", value: bill.bill_no ?? "—" },
-    { label: "District", value: bill.district ?? "—" },
+    { label: "District", value: (bill as any).district ?? "—" },
     { label: "Branch", value: bill.branch_name ?? "—" },
-    { label: "Godown", value: bill.godown_name ?? "—" },
+    { label: "Godown", value: (bill as any).godown_name ?? "—" },
     { label: "Commodity", value: bill.commodity ? `${bill.commodity.crop_name} (${bill.commodity.crop_year})` : "—" },
-    { label: "Financial Year", value: bill.financial_year ?? "—" },
+    { label: "Financial Year", value: (bill as any).financial_year ?? "—" },
     { label: "Month-Year", value: bill.month_year ?? "—" },
     { label: "Rate/Bag", value: formatCurrency(bill.rate_per_bag) },
     { label: "Opening Balance", value: bill.opening_balance ?? "—" },
@@ -52,6 +87,7 @@ export default function BillDetailPage() {
     { label: "Reserve Bags", value: bill.reserve_bags ?? "—" },
     { label: "Chargeable Bags", value: bill.chargeable_bags ?? "—" },
     { label: "Total Charge", value: formatCurrency(bill.total_charge) },
+    ...(operatorDepositor ? [{ label: "Depositor", value: operatorDepositor.name + (operatorDepositor.gst_no ? ` (${operatorDepositor.gst_no})` : "") }] : []),
     { label: "Created By", value: bill.creator?.name ?? "—" },
     { label: "Created At", value: formatDateTime(bill.created_at) },
   ];
@@ -97,23 +133,7 @@ export default function BillDetailPage() {
                 </button>
               </Link>
               <button
-                onClick={async () => {
-                  if (confirm("Request deletion of this bill?")) {
-                    try {
-                      await fetch(`/api/v1/bills/${bill.id}/request-delete`, {
-                        method: "POST",
-                        headers: {
-                          Authorization: `Bearer ${localStorage.getItem("mpw_token")}`,
-                          "Content-Type": "application/json",
-                        },
-                      });
-                      queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(bill.id) });
-                      alert("Delete request submitted");
-                    } catch {
-                      alert("Failed to submit delete request");
-                    }
-                  }
-                }}
+                onClick={() => setShowDeleteDialog(true)}
                 className="flex items-center gap-2 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />
@@ -122,6 +142,43 @@ export default function BillDetailPage() {
             </>
           )}
         </div>
+
+        {/* Delete reason dialog */}
+        {showDeleteDialog && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-red-700">Request Bill Deletion</h3>
+              <button onClick={() => { setShowDeleteDialog(false); setDeleteReason(""); setDeleteError(""); }}
+                className="text-red-400 hover:text-red-600">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-xs text-red-600">This will submit a delete request to the admin for approval. Please provide a reason.</p>
+            <textarea
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="Reason for deletion..."
+              rows={3}
+              className="w-full px-3 py-2 rounded-lg border border-red-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-red-200 resize-none"
+            />
+            {deleteError && <p className="text-xs text-red-600">{deleteError}</p>}
+            <div className="flex gap-2">
+              <button
+                onClick={handleRequestDelete}
+                disabled={deleteLoading}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-60"
+              >
+                {deleteLoading ? "Submitting..." : "Submit Delete Request"}
+              </button>
+              <button
+                onClick={() => { setShowDeleteDialog(false); setDeleteReason(""); setDeleteError(""); }}
+                className="px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-100"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Bill details */}
         <div className="bg-card border border-border rounded-xl p-5">
@@ -174,11 +231,7 @@ export default function BillDetailPage() {
               {bill.approval.remark_image_url && (
                 <div className="col-span-2 lg:col-span-3">
                   <div className="text-xs text-muted-foreground mb-1">Remark Image</div>
-                  <img
-                    src={bill.approval.remark_image_url}
-                    alt="Remark"
-                    className="h-32 rounded-lg object-cover border border-border"
-                  />
+                  <img src={bill.approval.remark_image_url} alt="Remark" className="h-32 rounded-lg object-cover border border-border" />
                 </div>
               )}
             </div>
@@ -197,6 +250,9 @@ export default function BillDetailPage() {
                     <div className="text-sm text-foreground">
                       By {v.creator?.name ?? "—"} · {formatDateTime(v.created_at)}
                     </div>
+                    {v.version_type === "delete" && v.data_json?.reason && (
+                      <div className="mt-1 text-xs text-muted-foreground">Reason: {v.data_json.reason}</div>
+                    )}
                     {v.version_type === "edit" && Object.keys(v.data_json).length > 0 && (
                       <div className="mt-1 text-xs text-muted-foreground">
                         Fields: {Object.keys(v.data_json).join(", ")}
