@@ -4,6 +4,8 @@ import { Layout } from "@/components/Layout";
 import { Plus } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDate } from "@/lib/utils";
+import { MP_DISTRICTS } from "@/lib/districts";
+import { SearchableSelect } from "@/components/SearchableSelect";
 
 export default function UsersPage() {
   const { data: users = [], isLoading } = useListUsers();
@@ -11,7 +13,15 @@ export default function UsersPage() {
   const queryClient = useQueryClient();
 
   const [showAdd, setShowAdd] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", password: "", role: "operator" as "admin" | "operator", branch_name: "", district_name: "", mobile_number: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "operator" as "admin" | "operator",
+    branch_name: "",
+    district_name: "",
+    mobile_number: "",
+  });
   const [error, setError] = useState("");
 
   const inputClass = "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary";
@@ -26,7 +36,7 @@ export default function UsersPage() {
           email: form.email,
           password: form.password,
           role: form.role,
-          branch_name: form.branch_name || undefined,
+          branch_name: form.branch_name ? form.branch_name.toUpperCase() : undefined,
           district_name: form.district_name || undefined,
           mobile_number: form.mobile_number || undefined,
         },
@@ -82,11 +92,21 @@ export default function UsersPage() {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Branch Name</label>
-                <input value={form.branch_name} onChange={(e) => setForm({ ...form, branch_name: e.target.value })} placeholder="Branch name" className={inputClass} />
+                <input
+                  value={form.branch_name}
+                  onChange={(e) => setForm({ ...form, branch_name: e.target.value.toUpperCase() })}
+                  placeholder="BRANCH NAME (uppercase)"
+                  className={inputClass + " uppercase"}
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">District</label>
-                <input value={form.district_name} onChange={(e) => setForm({ ...form, district_name: e.target.value })} placeholder="District" className={inputClass} />
+                <SearchableSelect
+                  options={MP_DISTRICTS}
+                  value={form.district_name}
+                  onChange={(v) => setForm({ ...form, district_name: v })}
+                  placeholder="Select district..."
+                />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1.5">Mobile Number</label>
@@ -110,6 +130,7 @@ export default function UsersPage() {
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Name</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Email</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Role</th>
+                <th className="text-left px-4 py-3 font-medium text-muted-foreground">District</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Branch</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Mobile</th>
                 <th className="text-left px-4 py-3 font-medium text-muted-foreground">Joined</th>
@@ -117,9 +138,9 @@ export default function UsersPage() {
             </thead>
             <tbody>
               {isLoading ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">Loading...</td></tr>
               ) : users.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-8 text-muted-foreground">No users yet</td></tr>
+                <tr><td colSpan={7} className="text-center py-8 text-muted-foreground">No users yet</td></tr>
               ) : users.map((u) => (
                 <tr key={u.id} className="border-b border-border last:border-0 hover:bg-muted/20">
                   <td className="px-4 py-3 font-medium text-foreground">{u.name}</td>
@@ -129,6 +150,7 @@ export default function UsersPage() {
                       {u.role}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-foreground">{u.district_name ?? "—"}</td>
                   <td className="px-4 py-3 text-foreground">{u.branch_name ?? "—"}</td>
                   <td className="px-4 py-3 text-foreground">{u.mobile_number ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{formatDate(u.created_at)}</td>

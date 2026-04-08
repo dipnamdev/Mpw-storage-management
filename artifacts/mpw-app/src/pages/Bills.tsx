@@ -7,12 +7,14 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { MP_DISTRICTS } from "@/lib/districts";
 
 interface FilterOptions {
   districts: string[];
   branch_names: string[];
   financial_years: string[];
   month_years: string[];
+  depositors: { id: number; name: string; gst_no: string | null }[];
 }
 
 function useFilterOptions() {
@@ -40,9 +42,10 @@ export default function BillsPage() {
   const [financialYear, setFinancialYear] = useState("");
   const [monthYear, setMonthYear] = useState("");
   const [commodityId, setCommodityId] = useState("");
+  const [depositorId, setDepositorId] = useState("");
   const [page, setPage] = useState(1);
 
-  const { data: filterOptions } = useFilterOptions();
+  const { data: filterOptions, refetch: refetchOptions } = useFilterOptions();
   const { data: commodities = [] } = useListCommodities();
 
   const { data, isLoading } = useListBills({
@@ -52,6 +55,7 @@ export default function BillsPage() {
     financial_year: financialYear || undefined,
     month_year: monthYear || undefined,
     commodity_id: commodityId ? parseInt(commodityId) : undefined,
+    depositor_id: depositorId ? parseInt(depositorId) : undefined,
     page,
     limit: 20,
   } as any);
@@ -73,11 +77,11 @@ export default function BillsPage() {
 
   const resetFilters = () => {
     setStatus(""); setDistrict(""); setBranchName("");
-    setFinancialYear(""); setMonthYear(""); setCommodityId("");
+    setFinancialYear(""); setMonthYear(""); setCommodityId(""); setDepositorId("");
     setPage(1);
   };
 
-  const hasFilters = status || district || branchName || financialYear || monthYear || commodityId;
+  const hasFilters = status || district || branchName || financialYear || monthYear || commodityId || depositorId;
 
   return (
     <Layout>
@@ -118,8 +122,8 @@ export default function BillsPage() {
               <button onClick={resetFilters} className="text-xs text-primary hover:underline">Clear all</button>
             )}
           </div>
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3">
-            {/* Status */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {/* Row 1 */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Status</label>
               <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass}>
@@ -130,18 +134,16 @@ export default function BillsPage() {
               </select>
             </div>
 
-            {/* District */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">District</label>
               <select value={district} onChange={(e) => { setDistrict(e.target.value); setPage(1); }} className={selectClass}>
                 <option value="">All Districts</option>
-                {(filterOptions?.districts ?? []).map((d) => (
+                {MP_DISTRICTS.map((d) => (
                   <option key={d} value={d}>{d}</option>
                 ))}
               </select>
             </div>
 
-            {/* Branch */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Branch Name</label>
               <select value={branchName} onChange={(e) => { setBranchName(e.target.value); setPage(1); }} className={selectClass}>
@@ -152,7 +154,6 @@ export default function BillsPage() {
               </select>
             </div>
 
-            {/* Financial Year */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Financial Year</label>
               <select value={financialYear} onChange={(e) => { setFinancialYear(e.target.value); setPage(1); }} className={selectClass}>
@@ -163,7 +164,7 @@ export default function BillsPage() {
               </select>
             </div>
 
-            {/* Month */}
+            {/* Row 2 */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Month</label>
               <select value={monthYear} onChange={(e) => { setMonthYear(e.target.value); setPage(1); }} className={selectClass}>
@@ -174,13 +175,22 @@ export default function BillsPage() {
               </select>
             </div>
 
-            {/* Commodity */}
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Commodity</label>
               <select value={commodityId} onChange={(e) => { setCommodityId(e.target.value); setPage(1); }} className={selectClass}>
                 <option value="">All Commodities</option>
                 {commodities.map((c) => (
                   <option key={c.id} value={c.id}>{c.crop_name} ({c.crop_year})</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs text-muted-foreground mb-1">Depositor</label>
+              <select value={depositorId} onChange={(e) => { setDepositorId(e.target.value); setPage(1); }} className={selectClass}>
+                <option value="">All Depositors</option>
+                {(filterOptions?.depositors ?? []).map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}{d.gst_no ? ` (${d.gst_no})` : ""}</option>
                 ))}
               </select>
             </div>

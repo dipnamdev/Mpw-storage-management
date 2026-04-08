@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db, billsTable, billVersionsTable, commoditiesTable, usersTable, billApprovalsTable, depositorsTable } from "@workspace/db";
-import { eq, and, desc, count, SQL } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { authMiddleware } from "../middlewares/auth";
 import { createNotification } from "../lib/notifications";
 
@@ -47,6 +47,7 @@ async function buildBillDetail(bill: typeof billsTable.$inferSelect) {
 
 router.get("/v1/bills/filter-options", authMiddleware, async (req, res): Promise<void> => {
   let bills = await db.select().from(billsTable);
+  const depositors = await db.select().from(depositorsTable);
 
   if (req.user!.role === "operator") {
     bills = bills.filter((b) => b.created_by === req.user!.id);
@@ -60,11 +61,12 @@ router.get("/v1/bills/filter-options", authMiddleware, async (req, res): Promise
     branch_names: unique(bills.map((b) => b.branch_name)),
     financial_years: unique(bills.map((b) => b.financial_year)),
     month_years: unique(bills.map((b) => b.month_year)),
+    depositors: depositors.map((d) => ({ id: d.id, name: d.name, gst_no: d.gst_no })),
   });
 });
 
 router.get("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
-  const { status, district, branch_name, financial_year, month_year, commodity_id, created_by, page = "1", limit = "20" } = req.query as Record<string, string>;
+  const { status, district, branch_name, financial_year, month_year, commodity_id, depositor_id, created_by, page = "1", limit = "20" } = req.query as Record<string, string>;
 
   const pageNum = parseInt(page, 10) || 1;
   const limitNum = parseInt(limit, 10) || 20;
@@ -83,6 +85,7 @@ router.get("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
   if (financial_year) bills = bills.filter((b) => b.financial_year === financial_year);
   if (month_year) bills = bills.filter((b) => b.month_year === month_year);
   if (commodity_id) bills = bills.filter((b) => b.commodity_id === parseInt(commodity_id, 10));
+  if (depositor_id) bills = bills.filter((b) => b.depositor_id === parseInt(depositor_id, 10));
   if (created_by && req.user!.role === "admin") bills = bills.filter((b) => b.created_by === parseInt(created_by, 10));
 
   const total = bills.length;
@@ -100,12 +103,22 @@ router.get("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
 });
 
 router.post("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
-  const { district, branch_name, godown_name, bill_no, commodity_id, crop_year, financial_year, month_year, rate_per_bag, opening_balance, closing_balance, received_bags, issue_bags, reserve_bags, chargeable_bags } = req.body;
+  const { godown_name, bill_no, commodity_id, depositor_id, crop_year, financial_year, month_year, rate_per_bag, opening_balance, closing_balance, received_bags, issue_bags, reserve_bags, chargeable_bags } = req.body;
+  let { district, branch_name } = req.body;
 
   if (!commodity_id) {
     res.status(400).json({ error: "commodity_id is required" });
     return;
   }
+
+  // For operators: force their own district and branch from user profile
+  if (req.user!.role === "operator") {
+    district = req.user!.district_name ?? district;
+    branch_name = req.user!.branch_name ?? branch_name;
+  }
+
+  // Always store branch_name in uppercase
+  if (branch_name) branch_name = branch_name.toUpperCase();
 
   const [commodity] = await db.select().from(commoditiesTable).where(eq(commoditiesTable.id, commodity_id));
   if (!commodity) {
@@ -126,6 +139,7 @@ router.post("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
       godown_name,
       bill_no,
       commodity_id,
+      depositor_id: depositor_id ? parseInt(depositor_id, 10) : null,
       crop_year,
       financial_year,
       month_year,

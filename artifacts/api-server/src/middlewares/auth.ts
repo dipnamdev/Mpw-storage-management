@@ -11,6 +11,8 @@ export interface AuthUser {
   email: string;
   role: "admin" | "operator";
   name: string;
+  district_name?: string | null;
+  branch_name?: string | null;
 }
 
 declare global {
@@ -40,7 +42,7 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
       res.status(401).json({ error: "User not found" });
       return;
     }
-    req.user = { id: user.id, email: user.email, role: user.role as "admin" | "operator", name: user.name };
+    req.user = { id: user.id, email: user.email, role: user.role as "admin" | "operator", name: user.name, district_name: user.district_name, branch_name: user.branch_name };
     next();
   } catch (err) {
     logger.warn({ err }, "Invalid token");

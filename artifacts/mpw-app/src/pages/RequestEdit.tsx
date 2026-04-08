@@ -5,6 +5,9 @@ import { Layout } from "@/components/Layout";
 import { ArrowLeft } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { MONTH_NAMES, getFinancialYearOptions, getYearOptions, joinMonthYear, splitMonthYear } from "@/lib/date-options";
+import { MP_DISTRICTS } from "@/lib/districts";
+import { SearchableSelect } from "@/components/SearchableSelect";
+import { useAuth } from "@/lib/auth";
 
 const FY_OPTIONS = getFinancialYearOptions();
 const YEAR_OPTIONS = getYearOptions();
@@ -14,6 +17,8 @@ export default function RequestEditPage() {
   const id = params?.id ? parseInt(params.id) : 0;
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const isOperator = user?.role === "operator";
 
   const { data: bill, isLoading } = useGetBill(id, { query: { enabled: !!id } });
   const { data: commodities = [] } = useListCommodities();
@@ -44,7 +49,7 @@ export default function RequestEditPage() {
       const { month, year } = splitMonthYear(bill.month_year ?? "");
       setForm({
         district: bill.district ?? "",
-        branch_name: bill.branch_name ?? "",
+        branch_name: bill.branch_name ? bill.branch_name.toUpperCase() : "",
         godown_name: bill.godown_name ?? "",
         bill_no: bill.bill_no ?? "",
         commodity_id: String(bill.commodity_id),
@@ -63,6 +68,7 @@ export default function RequestEditPage() {
     }
   }, [bill]);
 
+  // Auto-fill from commodity when changed
   useEffect(() => {
     const commodity = commodities.find((c) => c.id === parseInt(form.commodity_id));
     if (commodity && form.commodity_id !== String(bill?.commodity_id)) {
@@ -76,7 +82,11 @@ export default function RequestEditPage() {
 
   const set = (field: keyof typeof form) => (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => setForm((prev) => ({ ...prev, [field]: e.target.value }));
+  ) => {
+    let val = e.target.value;
+    if (field === "branch_name") val = val.toUpperCase();
+    setForm((prev) => ({ ...prev, [field]: val }));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,7 +96,7 @@ export default function RequestEditPage() {
     const changes: Record<string, unknown> = {};
 
     if (form.district !== (bill?.district ?? "")) changes.district = form.district;
-    if (form.branch_name !== (bill?.branch_name ?? "")) changes.branch_name = form.branch_name;
+    if (form.branch_name !== (bill?.branch_name ? bill.branch_name.toUpperCase() : "")) changes.branch_name = form.branch_name;
     if (form.godown_name !== (bill?.godown_name ?? "")) changes.godown_name = form.godown_name;
     if (form.bill_no !== (bill?.bill_no ?? "")) changes.bill_no = form.bill_no;
     if (form.crop_year !== (bill?.crop_year ?? "")) changes.crop_year = form.crop_year;
@@ -112,7 +122,7 @@ export default function RequestEditPage() {
   };
 
   const inputClass = "w-full px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors";
-  const selectClass = inputClass;
+  const lockedClass = "w-full px-3 py-2 rounded-lg border border-border bg-muted/40 text-sm text-muted-foreground cursor-not-allowed";
 
   if (isLoading) return (
     <Layout>
@@ -140,10 +150,9 @@ export default function RequestEditPage() {
 
         <form onSubmit={handleSubmit} className="bg-card border border-border rounded-xl p-6 space-y-5">
 
-          {/* Commodity */}
           <div>
             <label className="block text-sm font-medium text-foreground mb-1.5">Commodity</label>
-            <select value={form.commodity_id} onChange={set("commodity_id")} className={selectClass}>
+            <select value={form.commodity_id} onChange={set("commodity_id")} className={inputClass}>
               <option value="">Select commodity...</option>
               {commodities.map((c) => (
                 <option key={c.id} value={c.id}>{c.crop_name} — {c.crop_year} (₹{c.per_bag_per_month}/bag/month)</option>
@@ -156,27 +165,45 @@ export default function RequestEditPage() {
               <label className="block text-sm font-medium text-foreground mb-1.5">Bill No</label>
               <input value={form.bill_no} onChange={set("bill_no")} className={inputClass} />
             </div>
+
+            {/* District */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">District</label>
-              <input value={form.district} onChange={set("district")} className={inputClass} />
+              {isOperator ? (
+                <div className={lockedClass}>{form.district || "—"}</div>
+              ) : (
+                <SearchableSelect
+                  options={MP_DISTRICTS}
+                  value={form.district}
+                  onChange={(v) => setForm((prev) => ({ ...prev, district: v }))}
+                  placeholder="Select district..."
+                />
+              )}
             </div>
+
+            {/* Branch */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Branch Name</label>
-              <input value={form.branch_name} onChange={set("branch_name")} className={inputClass} />
+              {isOperator ? (
+                <div className={lockedClass}>{form.branch_name || "—"}</div>
+              ) : (
+                <input value={form.branch_name} onChange={set("branch_name")} className={inputClass + " uppercase"} placeholder="BRANCH NAME" />
+              )}
             </div>
+
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Godown Name</label>
               <input value={form.godown_name} onChange={set("godown_name")} className={inputClass} />
             </div>
+
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Crop Year</label>
               <input value={form.crop_year} onChange={set("crop_year")} placeholder="e.g. 2024-25" className={inputClass} />
             </div>
 
-            {/* Financial Year — dropdown */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Financial Year</label>
-              <select value={form.financial_year} onChange={set("financial_year")} className={selectClass}>
+              <select value={form.financial_year} onChange={set("financial_year")} className={inputClass}>
                 <option value="">Select financial year...</option>
                 {FY_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
               </select>
@@ -187,15 +214,14 @@ export default function RequestEditPage() {
               <input type="number" step="0.01" value={form.rate_per_bag} onChange={set("rate_per_bag")} className={inputClass} />
             </div>
 
-            {/* Month-Year — two selects */}
             <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Month-Year</label>
               <div className="flex gap-2">
-                <select value={form.month} onChange={set("month")} className={selectClass}>
+                <select value={form.month} onChange={set("month")} className={inputClass}>
                   <option value="">Month</option>
                   {MONTH_NAMES.map((m) => <option key={m} value={m}>{m}</option>)}
                 </select>
-                <select value={form.month_year_year} onChange={set("month_year_year")} className={selectClass}>
+                <select value={form.month_year_year} onChange={set("month_year_year")} className={inputClass}>
                   {YEAR_OPTIONS.map((y) => <option key={y} value={y}>{y}</option>)}
                 </select>
               </div>
@@ -207,7 +233,6 @@ export default function RequestEditPage() {
             </div>
           </div>
 
-          {/* Bag Quantities */}
           <div className="grid grid-cols-3 gap-4 border-t border-border pt-4">
             {[
               { key: "opening_balance", label: "Opening Balance" },
@@ -219,12 +244,7 @@ export default function RequestEditPage() {
             ].map(({ key, label }) => (
               <div key={key}>
                 <label className="block text-sm font-medium text-foreground mb-1.5">{label}</label>
-                <input
-                  type="number"
-                  value={(form as any)[key]}
-                  onChange={set(key as keyof typeof form)}
-                  className={inputClass}
-                />
+                <input type="number" value={(form as any)[key]} onChange={set(key as keyof typeof form)} className={inputClass} />
               </div>
             ))}
           </div>

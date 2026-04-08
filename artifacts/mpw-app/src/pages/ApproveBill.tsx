@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRoute, Link, useLocation } from "wouter";
 import { useGetBill, useListDepositors, useApproveBill, useRejectBill, useUploadImage, getGetBillQueryKey, getListBillsQueryKey } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
@@ -30,6 +30,13 @@ export default function ApproveBillPage() {
   const [showReject, setShowReject] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [error, setError] = useState("");
+
+  // Pre-fill depositor from the bill (operator already selected it)
+  useEffect(() => {
+    if (bill && (bill as any).depositor_id) {
+      setForm((prev) => ({ ...prev, depositor_id: String((bill as any).depositor_id) }));
+    }
+  }, [bill]);
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -67,7 +74,7 @@ export default function ApproveBillPage() {
       queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
       queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() });
       navigate(`/bills/${id}`);
-    } catch (err: unknown) {
+    } catch {
       setError("Failed to approve bill");
     }
   };
@@ -102,6 +109,8 @@ export default function ApproveBillPage() {
     );
   }
 
+  const operatorDepositor = depositors.find((d) => d.id === (bill as any)?.depositor_id);
+
   return (
     <Layout>
       <div className="max-w-2xl space-y-5">
@@ -134,12 +143,23 @@ export default function ApproveBillPage() {
           </div>
         )}
 
+        {/* Operator's pre-selected depositor notice */}
+        {operatorDepositor && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
+            Depositor pre-selected by operator: <strong>{operatorDepositor.name}</strong>
+            {operatorDepositor.gst_no ? ` (${operatorDepositor.gst_no})` : ""}. You can change it below if needed.
+          </div>
+        )}
+
         {/* Approval form */}
         <form onSubmit={handleApprove} className="bg-card border border-border rounded-xl p-6 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Approval Details</h2>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Depositor *</label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">
+              Depositor *
+              {operatorDepositor && <span className="text-xs text-blue-600 ml-2">(pre-filled by operator)</span>}
+            </label>
             <select
               value={form.depositor_id}
               onChange={(e) => setForm({ ...form, depositor_id: e.target.value })}

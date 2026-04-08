@@ -3,6 +3,7 @@ import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { usersTable } from "./users";
 import { commoditiesTable } from "./commodities";
+import { depositorsTable } from "./depositors";
 
 export const billStatusEnum = pgEnum("bill_status", ["pending", "approved", "rejected"]);
 export const versionTypeEnum = pgEnum("version_type", ["edit", "delete"]);
@@ -16,6 +17,7 @@ export const billsTable = pgTable("bills", {
   godown_name: text("godown_name"),
   bill_no: text("bill_no"),
   commodity_id: integer("commodity_id").notNull().references(() => commoditiesTable.id),
+  depositor_id: integer("depositor_id").references(() => depositorsTable.id),
   crop_year: text("crop_year"),
   financial_year: text("financial_year"),
   month_year: text("month_year"),
