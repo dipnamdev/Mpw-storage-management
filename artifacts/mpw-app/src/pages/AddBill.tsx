@@ -308,7 +308,7 @@ export default function AddBillPage() {
               <div className={lockedClass}>
                 {selectedDepositor
                   ? `${selectedDepositor.name}${selectedDepositor.gst_no ? ` (${selectedDepositor.gst_no})` : ""}`
-                  : (form.depositor_id ? "—" : "None")}
+                  : "—"}
               </div>
             ) : (
               <select value={form.depositor_id} onChange={set("depositor_id")} className={inputClass}>
@@ -458,7 +458,7 @@ export default function AddBillPage() {
                     GST {selectedDepositor?.total_gst != null ? `(${selectedDepositor.total_gst}%)` : ""} (₹)
                   </label>
                   <div className={derivedClass}>
-                    {gstAmount != null ? `₹${gstAmount.toFixed(2)}` : (form.depositor_id ? "—" : "Select depositor")}
+                    {gstAmount != null ? `₹${gstAmount.toFixed(2)}` : "—"}
                   </div>
                 </div>
                 <div>

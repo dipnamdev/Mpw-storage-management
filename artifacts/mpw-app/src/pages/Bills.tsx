@@ -284,7 +284,9 @@ export default function BillsPage() {
                       <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{formatDate(bill.created_at)}</td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <Link href={`/bills/${bill.id}`}>
-                          <span className="text-primary hover:underline text-xs">View</span>
+                          <span className="inline-flex items-center px-3 py-1.5 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 transition-colors">
+                            View
+                          </span>
                         </Link>
                       </td>
                     </tr>
