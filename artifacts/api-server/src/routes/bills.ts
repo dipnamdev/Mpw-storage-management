@@ -133,6 +133,14 @@ router.get("/v1/bills/cycle-lookup", authMiddleware, async (req, res): Promise<v
     cycle: latest.cycle,
     serial_no: latest.serial_no,
     month_year: latest.month_year,
+    district: latest.district,
+    branch_name: latest.branch_name,
+    godown_name: latest.godown_name,
+    commodity_id: latest.commodity_id,
+    depositor_id: latest.depositor_id,
+    crop_year: latest.crop_year,
+    financial_year: latest.financial_year,
+    rate_per_bag: latest.rate_per_bag,
   });
 });
 
