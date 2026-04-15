@@ -72,9 +72,20 @@ export default function BillDetailPage() {
 
   const operatorDepositor = depositors.find((d) => d.id === (bill as any).depositor_id);
 
+  const cycleNum = (bill as any).cycle as number | null | undefined;
+  const billingDateVal = (bill as any).billing_date as string | null | undefined;
+
   const fields = [
     { label: "Serial No", value: `#${bill.serial_no}` },
     { label: "Bill No", value: bill.bill_no ?? "—" },
+    {
+      label: "Billing Date",
+      value: billingDateVal ? new Date(billingDateVal).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—",
+    },
+    {
+      label: "Billing Cycle",
+      value: cycleNum != null ? `Cycle ${cycleNum} (${cycleNum === 1 ? "1st–15th" : "16th–31st"})` : "—",
+    },
     { label: "District", value: (bill as any).district ?? "—" },
     { label: "Branch", value: bill.branch_name ?? "—" },
     { label: "Godown", value: (bill as any).godown_name ?? "—" },
@@ -85,9 +96,9 @@ export default function BillDetailPage() {
     { label: "Opening Balance", value: bill.opening_balance ?? "—" },
     { label: "Received Bags", value: bill.received_bags ?? "—" },
     { label: "Issue Bags", value: bill.issue_bags ?? "—" },
-    { label: "Closing Balance", value: bill.closing_balance ?? "—" },
     { label: "Reserve Bags", value: bill.reserve_bags ?? "—" },
     { label: "Chargeable Bags", value: bill.chargeable_bags ?? "—" },
+    { label: "Closing Balance", value: bill.closing_balance ?? "—" },
     { label: "Total Charge", value: formatCurrency(bill.total_charge) },
     ...(operatorDepositor ? [{ label: "Depositor", value: operatorDepositor.name + (operatorDepositor.gst_no ? ` (${operatorDepositor.gst_no})` : "") }] : []),
     { label: "Created By", value: bill.creator?.name ?? "—" },

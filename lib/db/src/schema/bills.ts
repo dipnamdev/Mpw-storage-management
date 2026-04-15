@@ -21,6 +21,8 @@ export const billsTable = pgTable("bills", {
   crop_year: text("crop_year"),
   financial_year: text("financial_year"),
   month_year: text("month_year"),
+  billing_date: timestamp("billing_date", { withTimezone: true }),
+  cycle: integer("cycle"),
   rate_per_bag: numeric("rate_per_bag", { precision: 10, scale: 2 }),
   opening_balance: integer("opening_balance"),
   closing_balance: integer("closing_balance"),
@@ -37,6 +39,7 @@ export const billsTable = pgTable("bills", {
   index("bills_status_idx").on(table.status),
   index("bills_created_by_idx").on(table.created_by),
   index("bills_commodity_id_idx").on(table.commodity_id),
+  index("bills_bill_no_idx").on(table.bill_no),
 ]);
 
 export const insertBillSchema = createInsertSchema(billsTable).omit({ id: true, serial_no: true, created_at: true });

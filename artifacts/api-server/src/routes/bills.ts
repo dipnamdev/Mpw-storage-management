@@ -102,8 +102,42 @@ router.get("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
   });
 });
 
+// Cycle lookup: find the latest closing_balance for bills with the same bill_no
+router.get("/v1/bills/cycle-lookup", authMiddleware, async (req, res): Promise<void> => {
+  const { bill_no } = req.query as Record<string, string>;
+  if (!bill_no) {
+    res.json({ found: false });
+    return;
+  }
+
+  const bills = await db
+    .select()
+    .from(billsTable)
+    .where(eq(billsTable.bill_no, bill_no))
+    .orderBy(desc(billsTable.created_at));
+
+  // Scope operators to their own bills
+  const filtered = req.user!.role === "operator"
+    ? bills.filter((b) => b.created_by === req.user!.id)
+    : bills;
+
+  if (filtered.length === 0) {
+    res.json({ found: false });
+    return;
+  }
+
+  const latest = filtered[0];
+  res.json({
+    found: true,
+    closing_balance: latest.closing_balance,
+    cycle: latest.cycle,
+    serial_no: latest.serial_no,
+    month_year: latest.month_year,
+  });
+});
+
 router.post("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
-  const { godown_name, bill_no, commodity_id, depositor_id, crop_year, financial_year, month_year, rate_per_bag, opening_balance, closing_balance, received_bags, issue_bags, reserve_bags, chargeable_bags } = req.body;
+  const { godown_name, bill_no, commodity_id, depositor_id, crop_year, financial_year, month_year, billing_date, rate_per_bag, opening_balance, received_bags, issue_bags, reserve_bags } = req.body;
   let { district, branch_name } = req.body;
 
   if (!commodity_id) {
@@ -126,9 +160,27 @@ router.post("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
     return;
   }
 
-  const receivedBagsNum = received_bags ? parseInt(received_bags, 10) : 0;
+  // ── Billing date & cycle ──────────────────────────────────────────────────
+  const billingDateObj: Date = billing_date ? new Date(billing_date) : new Date();
+  const billingDay = billingDateObj.getDate();
+  const cycle = billingDay <= 15 ? 1 : 2;
+
+  // ── Bag calculations ──────────────────────────────────────────────────────
+  // Opening Balance = Chargeable Bags
+  const openingBal   = opening_balance != null ? parseInt(String(opening_balance), 10) : 0;
+  const receivedBags = received_bags   != null ? parseInt(String(received_bags),   10) : 0;
+  const issueBags    = issue_bags      != null ? parseInt(String(issue_bags),       10) : 0;
+  const reserveBags  = reserve_bags    != null ? parseInt(String(reserve_bags),     10) : 0;
+
+  // Chargeable Bags ≡ Opening Balance
+  const chargeableBags = openingBal;
+
+  // Closing Balance = Opening Balance + Received Bags − Issue Bags + Reserve Bags
+  const closingBal = openingBal + receivedBags - issueBags + reserveBags;
+
+  // Total Charge = Chargeable Bags × Rate ÷ 2
   const perBagPerMonth = parseFloat(commodity.per_bag_per_month);
-  const total_charge = receivedBagsNum * perBagPerMonth / 2;
+  const total_charge = chargeableBags * perBagPerMonth / 2;
 
   const [bill] = await db
     .insert(billsTable)
@@ -143,13 +195,15 @@ router.post("/v1/bills", authMiddleware, async (req, res): Promise<void> => {
       crop_year,
       financial_year,
       month_year,
+      billing_date: billingDateObj,
+      cycle,
       rate_per_bag: rate_per_bag != null ? String(rate_per_bag) : null,
-      opening_balance: opening_balance != null ? parseInt(opening_balance, 10) : null,
-      closing_balance: closing_balance != null ? parseInt(closing_balance, 10) : null,
-      received_bags: receivedBagsNum,
-      issue_bags: issue_bags != null ? parseInt(issue_bags, 10) : null,
-      reserve_bags: reserve_bags != null ? parseInt(reserve_bags, 10) : null,
-      chargeable_bags: chargeable_bags != null ? parseInt(chargeable_bags, 10) : null,
+      opening_balance: openingBal,
+      closing_balance: closingBal,
+      received_bags: receivedBags,
+      issue_bags: issueBags,
+      reserve_bags: reserveBags,
+      chargeable_bags: chargeableBags,
       total_charge: String(total_charge),
       status: "pending",
       is_locked: false,
