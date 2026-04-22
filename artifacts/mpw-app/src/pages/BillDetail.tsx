@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRoute, Link, useLocation } from "wouter";
-import { useGetBill, useListDepositors, getGetBillQueryKey } from "@workspace/api-client-react";
+import { useGetBill, useListBills, useListDepositors, getGetBillQueryKey } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth";
@@ -16,7 +16,8 @@ export default function BillDetailPage() {
   const [, navigate] = useLocation();
   const queryClient = useQueryClient();
 
-  const { data: bill, isLoading } = useGetBill(id, { query: { enabled: !!id } });
+  const { data: billById, isLoading: billLoading } = useGetBill(id, { query: { enabled: !!id } });
+  const { data: billsData } = useListBills({ page: 1, limit: 1000 } as any);
   const { data: depositors = [] } = useListDepositors();
 
   const { toast } = useToast();
@@ -24,6 +25,13 @@ export default function BillDetailPage() {
   const [deleteReason, setDeleteReason] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const bill = useMemo(() => {
+    if (billById) return billById as any;
+    return (billsData?.bills ?? []).find((b: any) => b.id === id || b.serial_no === id) as any;
+  }, [billById, billsData, id]);
+
+  const isLoading = billLoading && !bill;
 
   const handleRequestDelete = async () => {
     if (!deleteReason.trim()) {
@@ -70,13 +78,13 @@ export default function BillDetailPage() {
     );
   }
 
-  const operatorDepositor = depositors.find((d) => d.id === (bill as any).depositor_id);
-  const cycleNum = (bill as any).cycle as number | null | undefined;
-  const billingDateVal = (bill as any).billing_date as string | null | undefined;
-  const billType = (bill as any).bill_type as string | null | undefined;
-  const gstBillNo = (bill as any).gst_bill_no as string | null | undefined;
-  const deductionAmount = (bill as any).deduction_amount as number | string | null | undefined;
-  const passAmount = (bill as any).pass_amount as number | string | null | undefined;
+  const operatorDepositor = depositors.find((d) => d.id === bill.depositor_id);
+  const cycleNum = bill.cycle as number | null | undefined;
+  const billingDateVal = bill.billing_date as string | null | undefined;
+  const billType = bill.bill_type as string | null | undefined;
+  const gstBillNo = bill.gst_bill_no as string | null | undefined;
+  const deductionAmount = bill.deduction_amount as number | string | null | undefined;
+  const passAmount = bill.pass_amount as number | string | null | undefined;
 
   const fields = [
     { label: "Serial No", value: `#${bill.serial_no}` },
@@ -85,11 +93,11 @@ export default function BillDetailPage() {
     { label: "GST Bill Number", value: gstBillNo ?? "—" },
     { label: "Billing Date", value: billingDateVal ? new Date(billingDateVal).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—" },
     { label: "Billing Cycle", value: cycleNum != null ? `Cycle ${cycleNum}` : "—" },
-    { label: "District", value: (bill as any).district ?? "—" },
+    { label: "District", value: bill.district ?? "—" },
     { label: "Branch", value: bill.branch_name ?? "—" },
-    { label: "Godown", value: (bill as any).godown_name ?? "—" },
+    { label: "Godown", value: bill.godown_name ?? "—" },
     { label: "Commodity", value: bill.commodity ? `${bill.commodity.crop_name} (${bill.commodity.crop_year})` : "—" },
-    { label: "Financial Year", value: (bill as any).financial_year ?? "—" },
+    { label: "Financial Year", value: bill.financial_year ?? "—" },
     { label: "Month-Year", value: bill.month_year ?? "—" },
     { label: "Rate/Bag", value: formatCurrency(bill.rate_per_bag) },
     { label: "Opening Balance", value: bill.opening_balance ?? "—" },
