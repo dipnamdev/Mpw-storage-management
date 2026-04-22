@@ -22,42 +22,47 @@ export default function ApproveBillPage() {
   const [form, setForm] = useState({
     depositor_id: "",
     pass_amount: "",
+    deduction_amount: "",
     payment_method: "",
     neft_no: "",
     remark: "",
-    remark_image_url: "",
+    remark_document_url: "",
   });
   const [rejectReason, setRejectReason] = useState("");
   const [showReject, setShowReject] = useState(false);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [documentPreview, setDocumentPreview] = useState<string | null>(null);
+  const [documentName, setDocumentName] = useState<string>("");
   const [error, setError] = useState("");
   const { toast } = useToast();
 
-  // Pre-fill depositor from the bill (operator already selected it)
   useEffect(() => {
     if (bill && (bill as any).depositor_id) {
       setForm((prev) => ({ ...prev, depositor_id: String((bill as any).depositor_id) }));
     }
+    if (bill && (bill as any).pass_amount != null) {
+      setForm((prev) => ({ ...prev, pass_amount: String((bill as any).pass_amount) }));
+    }
   }, [bill]);
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const formData = new FormData();
     formData.append("file", file);
     try {
       const result = await uploadMutation.mutateAsync({ data: formData as any });
-      setForm((prev) => ({ ...prev, remark_image_url: result.url }));
-      setImagePreview(URL.createObjectURL(file));
+      setForm((prev) => ({ ...prev, remark_document_url: result.url }));
+      setDocumentPreview(result.url);
+      setDocumentName(file.name);
     } catch {
-      setError("Failed to upload image");
+      setError("Failed to upload document");
     }
   };
 
   const handleApprove = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    if (!form.depositor_id || !form.pass_amount || !form.payment_method) {
+    if (!form.depositor_id || (!form.pass_amount && !form.deduction_amount) || !form.payment_method) {
       setError("Depositor, pass amount, and payment method are required");
       return;
     }
@@ -66,11 +71,12 @@ export default function ApproveBillPage() {
         billId: id,
         data: {
           depositor_id: parseInt(form.depositor_id),
-          pass_amount: parseFloat(form.pass_amount),
+          pass_amount: form.pass_amount ? parseFloat(form.pass_amount) : undefined,
+          deduction_amount: form.deduction_amount ? parseFloat(form.deduction_amount) : undefined,
           payment_method: form.payment_method,
           neft_no: form.neft_no || undefined,
           remark: form.remark || undefined,
-          remark_image_url: form.remark_image_url || undefined,
+          remark_document_url: form.remark_document_url || undefined,
         },
       });
       queryClient.invalidateQueries({ queryKey: getGetBillQueryKey(id) });
@@ -127,7 +133,6 @@ export default function ApproveBillPage() {
           <h1 className="text-xl font-bold text-foreground">Approve Bill #{bill?.serial_no}</h1>
         </div>
 
-        {/* Bill summary */}
         {bill && (
           <div className="bg-muted/40 border border-border rounded-xl p-4">
             <div className="grid grid-cols-3 gap-4 text-sm">
@@ -147,7 +152,6 @@ export default function ApproveBillPage() {
           </div>
         )}
 
-        {/* Operator's pre-selected depositor notice */}
         {operatorDepositor && (
           <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-sm text-blue-700">
             Depositor pre-selected by operator: <strong>{operatorDepositor.name}</strong>
@@ -155,15 +159,11 @@ export default function ApproveBillPage() {
           </div>
         )}
 
-        {/* Approval form */}
         <form onSubmit={handleApprove} className="bg-card border border-border rounded-xl p-6 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Approval Details</h2>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">
-              Depositor *
-              {operatorDepositor && <span className="text-xs text-blue-600 ml-2">(pre-filled by operator)</span>}
-            </label>
+            <label className="block text-sm font-medium text-foreground mb-1.5">Depositor *</label>
             <select
               value={form.depositor_id}
               onChange={(e) => setForm({ ...form, depositor_id: e.target.value })}
@@ -185,7 +185,17 @@ export default function ApproveBillPage() {
                 step="0.01"
                 value={form.pass_amount}
                 onChange={(e) => setForm({ ...form, pass_amount: e.target.value })}
-                required
+                placeholder="0.00"
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Deduction Amount (₹)</label>
+              <input
+                type="number"
+                step="0.01"
+                value={form.deduction_amount}
+                onChange={(e) => setForm({ ...form, deduction_amount: e.target.value })}
                 placeholder="0.00"
                 className={inputClass}
               />
@@ -230,14 +240,17 @@ export default function ApproveBillPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-foreground mb-1.5">Remark Image (optional)</label>
-            {imagePreview ? (
-              <div className="relative inline-block">
-                <img src={imagePreview} alt="Remark" className="h-32 rounded-lg object-cover border border-border" />
+            <label className="block text-sm font-medium text-foreground mb-1.5">Remark Document (optional)</label>
+            {documentPreview ? (
+              <div className="flex items-center justify-between gap-3 px-4 py-3 border border-border rounded-lg">
+                <div className="text-sm">
+                  <div className="font-medium">{documentName || "Uploaded document"}</div>
+                  <div className="text-xs text-muted-foreground">PDF or image uploaded</div>
+                </div>
                 <button
                   type="button"
-                  onClick={() => { setImagePreview(null); setForm({ ...form, remark_image_url: "" }); }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
+                  onClick={() => { setDocumentPreview(null); setDocumentName(""); setForm({ ...form, remark_document_url: "" }); }}
+                  className="w-6 h-6 bg-destructive text-white rounded-full flex items-center justify-center"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -245,10 +258,8 @@ export default function ApproveBillPage() {
             ) : (
               <label className="flex items-center gap-2 w-full px-4 py-3 border-2 border-dashed border-border rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
                 <Upload className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  {uploadMutation.isPending ? "Uploading..." : "Click to upload image"}
-                </span>
-                <input type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
+                <span className="text-sm text-muted-foreground">{uploadMutation.isPending ? "Uploading..." : "Click to upload PDF or image"}</span>
+                <input type="file" accept="image/*,application/pdf" onChange={handleDocumentUpload} className="hidden" />
               </label>
             )}
           </div>

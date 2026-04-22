@@ -36,10 +36,11 @@ router.post("/v1/approvals/approve/:billId", authMiddleware, requireAdmin, async
   const raw = Array.isArray(req.params.billId) ? req.params.billId[0] : req.params.billId;
   const billId = parseInt(raw, 10);
 
-  const { depositor_id, pass_amount, payment_method, neft_no, remark, remark_image_url } = req.body;
+  const { depositor_id, pass_amount, deduction_amount, payment_method, neft_no, remark, remark_document_url } = req.body;
+  const finalPassAmount = pass_amount != null ? pass_amount : deduction_amount;
 
-  if (!depositor_id || pass_amount == null || !payment_method) {
-    res.status(400).json({ error: "depositor_id, pass_amount, and payment_method are required" });
+  if (!depositor_id || finalPassAmount == null || !payment_method) {
+    res.status(400).json({ error: "depositor_id, pass amount, and payment_method are required" });
     return;
   }
 
@@ -54,13 +55,11 @@ router.post("/v1/approvals/approve/:billId", authMiddleware, requireAdmin, async
     return;
   }
 
-  // Update bill status
   await db
     .update(billsTable)
     .set({ status: "approved", is_locked: true })
     .where(eq(billsTable.id, billId));
 
-  // Create approval record
   const existing = await db.select().from(billApprovalsTable).where(eq(billApprovalsTable.bill_id, billId));
   let approval;
   if (existing.length > 0) {
@@ -68,11 +67,11 @@ router.post("/v1/approvals/approve/:billId", authMiddleware, requireAdmin, async
       .update(billApprovalsTable)
       .set({
         depositor_id,
-        pass_amount: String(pass_amount),
+        pass_amount: String(finalPassAmount),
         payment_method,
         neft_no: neft_no ?? null,
         remark: remark ?? null,
-        remark_image_url: remark_image_url ?? null,
+        remark_image_url: remark_document_url ?? null,
         approved_by: req.user!.id,
         approved_at: new Date(),
       })
@@ -84,27 +83,25 @@ router.post("/v1/approvals/approve/:billId", authMiddleware, requireAdmin, async
       .values({
         bill_id: billId,
         depositor_id,
-        pass_amount: String(pass_amount),
+        pass_amount: String(finalPassAmount),
         payment_method,
         neft_no: neft_no ?? null,
         remark: remark ?? null,
-        remark_image_url: remark_image_url ?? null,
+        remark_image_url: remark_document_url ?? null,
         approved_by: req.user!.id,
         approved_at: new Date(),
       })
       .returning();
   }
 
-  // Notify operator
   await createNotification({
     user_id: bill.created_by,
     title: "Bill Approved",
-    message: `Your bill (serial #${bill.serial_no}) has been approved. Pass amount: ${pass_amount}.`,
+    message: `Your bill (serial #${bill.serial_no}) has been approved. Pass amount: ${finalPassAmount}.`,
     type: "web",
     link_url: `/bills/${billId}`,
   });
 
-  // Return updated bill detail
   const [updatedBill] = await db.select().from(billsTable).where(eq(billsTable.id, billId));
   const [creator] = await db.select().from(usersTable).where(eq(usersTable.id, updatedBill.created_by));
   const versions = await db.select().from(billVersionsTable).where(eq(billVersionsTable.bill_id, billId));
@@ -143,7 +140,6 @@ router.post("/v1/approvals/reject/:billId", authMiddleware, requireAdmin, async 
 
   await db.update(billsTable).set({ status: "rejected" }).where(eq(billsTable.id, billId));
 
-  // Notify operator
   await createNotification({
     user_id: bill.created_by,
     title: "Bill Rejected",
@@ -203,7 +199,6 @@ router.post("/v1/approvals/versions/:versionId/approve", authMiddleware, require
     return;
   }
 
-  // Apply changes or delete based on version_type
   const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, version.bill_id));
 
   if (version.version_type === "edit") {
@@ -217,35 +212,26 @@ router.post("/v1/approvals/versions/:versionId/approve", authMiddleware, require
     if (Object.keys(sanitizedChanges).length > 0) {
       await db.update(billsTable).set(sanitizedChanges as any).where(eq(billsTable.id, version.bill_id));
     }
+  } else if (version.version_type === "delete") {
+    await db.delete(billsTable).where(eq(billsTable.id, version.bill_id));
   }
-  // For delete type, we keep the bill but mark it — in full production, could actually delete
 
   await db.update(billVersionsTable).set({ status: "approved" }).where(eq(billVersionsTable.id, versionId));
 
-  // Notify creator
   await createNotification({
-    user_id: version.created_by,
-    title: version.version_type === "edit" ? "Edit Request Approved" : "Delete Request Approved",
-    message: `Your ${version.version_type} request for Bill #${bill?.serial_no} has been approved.`,
+    user_id: bill.created_by,
+    title: "Version Approved",
+    message: `Your bill version request has been approved.`,
     type: "web",
-    link_url: bill ? `/bills/${bill.id}` : `/bills`,
+    link_url: `/bills/${bill.id}`,
   });
 
-  const [updatedVersion] = await db.select().from(billVersionsTable).where(eq(billVersionsTable.id, versionId));
-  const [creator] = await db.select().from(usersTable).where(eq(usersTable.id, updatedVersion.created_by));
-
-  res.json({
-    ...updatedVersion,
-    data_json: JSON.parse(updatedVersion.data_json),
-    creator: creator ? { id: creator.id, name: creator.name, email: creator.email, role: creator.role, branch_name: creator.branch_name, district_name: creator.district_name, mobile_number: creator.mobile_number, created_at: creator.created_at } : null,
-    bill: null,
-  });
+  res.json({ success: true });
 });
 
 router.post("/v1/approvals/versions/:versionId/reject", authMiddleware, requireAdmin, async (req, res): Promise<void> => {
   const raw = Array.isArray(req.params.versionId) ? req.params.versionId[0] : req.params.versionId;
   const versionId = parseInt(raw, 10);
-  const { reason } = req.body;
 
   const [version] = await db.select().from(billVersionsTable).where(eq(billVersionsTable.id, versionId));
   if (!version) {
@@ -253,33 +239,8 @@ router.post("/v1/approvals/versions/:versionId/reject", authMiddleware, requireA
     return;
   }
 
-  if (version.status !== "pending") {
-    res.status(400).json({ error: `Version is already ${version.status}` });
-    return;
-  }
-
   await db.update(billVersionsTable).set({ status: "rejected" }).where(eq(billVersionsTable.id, versionId));
-
-  const [bill] = await db.select().from(billsTable).where(eq(billsTable.id, version.bill_id));
-
-  // Notify creator
-  await createNotification({
-    user_id: version.created_by,
-    title: version.version_type === "edit" ? "Edit Request Rejected" : "Delete Request Rejected",
-    message: `Your ${version.version_type} request for Bill #${bill?.serial_no} has been rejected. ${reason ? "Reason: " + reason : ""}`,
-    type: "web",
-    link_url: bill ? `/bills/${bill.id}` : `/bills`,
-  });
-
-  const [updatedVersion] = await db.select().from(billVersionsTable).where(eq(billVersionsTable.id, versionId));
-  const [creator] = await db.select().from(usersTable).where(eq(usersTable.id, updatedVersion.created_by));
-
-  res.json({
-    ...updatedVersion,
-    data_json: JSON.parse(updatedVersion.data_json),
-    creator: creator ? { id: creator.id, name: creator.name, email: creator.email, role: creator.role, branch_name: creator.branch_name, district_name: creator.district_name, mobile_number: creator.mobile_number, created_at: creator.created_at } : null,
-    bill: null,
-  });
+  res.json({ success: true });
 });
 
 export default router;
