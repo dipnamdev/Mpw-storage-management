@@ -45,6 +45,38 @@ async function buildBillDetail(bill: typeof billsTable.$inferSelect) {
   };
 }
 
+router.get("/v1/bills/stats", authMiddleware, async (req, res): Promise<void> => {
+  const { status, district, branch_name, financial_year, month_year, commodity_id, depositor_id, created_by } = req.query as Record<string, string>;
+
+  let bills = await db.select().from(billsTable);
+  if (req.user!.role === "operator") bills = bills.filter((b) => b.created_by === req.user!.id);
+  if (status) bills = bills.filter((b) => b.status === status);
+  if (district) bills = bills.filter((b) => b.district === district);
+  if (branch_name) bills = bills.filter((b) => b.branch_name === branch_name);
+  if (financial_year) bills = bills.filter((b) => b.financial_year === financial_year);
+  if (month_year) bills = bills.filter((b) => b.month_year === month_year);
+  if (commodity_id) bills = bills.filter((b) => b.commodity_id === parseInt(commodity_id, 10));
+  if (depositor_id) bills = bills.filter((b) => b.depositor_id === parseInt(depositor_id, 10));
+  if (created_by && req.user!.role === "admin") bills = bills.filter((b) => b.created_by === parseInt(created_by, 10));
+
+  const sumCharge = (arr: typeof bills) =>
+    arr.reduce((s, b) => s + (b.total_charge != null ? parseFloat(b.total_charge) || 0 : 0), 0);
+
+  const approvedBills = bills.filter((b) => b.status === "approved");
+  const rejectedBills = bills.filter((b) => b.status === "rejected");
+  const pendingBills = bills.filter((b) => b.status === "pending");
+
+  res.json({
+    total: bills.length,
+    approved: approvedBills.length,
+    rejected: rejectedBills.length,
+    pending: pendingBills.length,
+    claim_amount: sumCharge(approvedBills),
+    pending_amount: sumCharge(pendingBills),
+    total_amount: sumCharge(bills),
+  });
+});
+
 router.get("/v1/bills/filter-options", authMiddleware, async (req, res): Promise<void> => {
   let bills = await db.select().from(billsTable);
   const depositors = await db.select().from(depositorsTable);

@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { Link } from "wouter";
-import { useListBills, useListCommodities } from "@workspace/api-client-react";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { useListBills, useListCommodities, useListUsers } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, Download, ChevronLeft, ChevronRight, Clock, AlertCircle } from "lucide-react";
+import { Plus, Download, ChevronLeft, ChevronRight, Clock, AlertCircle, FileText, CheckCircle2, XCircle, IndianRupee, X } from "lucide-react";
 import { MP_DISTRICTS } from "@/lib/districts";
 
 interface FilterOptions {
@@ -15,6 +15,16 @@ interface FilterOptions {
   financial_years: string[];
   month_years: string[];
   depositors: { id: number; name: string; gst_no: string | null }[];
+}
+
+interface BillStats {
+  total: number;
+  approved: number;
+  rejected: number;
+  pending: number;
+  claim_amount: number;
+  pending_amount: number;
+  total_amount: number;
 }
 
 function useFilterOptions() {
@@ -31,11 +41,29 @@ function useFilterOptions() {
   });
 }
 
+function useBillStats(params: Record<string, string | number | undefined>) {
+  return useQuery<BillStats>({
+    queryKey: ["bills-stats", params],
+    queryFn: async () => {
+      const token = localStorage.getItem("mpw_token");
+      const query = new URLSearchParams();
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined && v !== "" && v !== null) query.set(k, String(v));
+      });
+      const res = await fetch(`/api/v1/bills/stats?${query.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return res.json();
+    },
+  });
+}
+
 const selectClass =
   "px-3 py-2 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 w-full";
 
 export default function BillsPage() {
   const { user } = useAuth();
+  const [location] = useLocation();
   const [status, setStatus] = useState("");
   const [district, setDistrict] = useState("");
   const [branchName, setBranchName] = useState("");
@@ -43,12 +71,29 @@ export default function BillsPage() {
   const [monthYear, setMonthYear] = useState("");
   const [commodityId, setCommodityId] = useState("");
   const [depositorId, setDepositorId] = useState("");
+  const [createdBy, setCreatedBy] = useState<string>("");
   const [page, setPage] = useState(1);
+
+  // Read created_by from URL on first load / when URL changes
+  useEffect(() => {
+    const search = typeof window !== "undefined" ? window.location.search : "";
+    const params = new URLSearchParams(search);
+    const cb = params.get("created_by") ?? "";
+    setCreatedBy(cb);
+    setPage(1);
+  }, [location]);
 
   const { data: filterOptions } = useFilterOptions();
   const { data: commodities = [] } = useListCommodities();
+  const { data: usersList = [] } = useListUsers(undefined, {
+    query: { enabled: user?.role === "admin" },
+  });
+  const filterUser = useMemo(
+    () => (createdBy ? usersList.find((u) => String(u.id) === createdBy) : undefined),
+    [createdBy, usersList],
+  );
 
-  const { data, isLoading } = useListBills({
+  const filterParams = {
     status: status || undefined,
     district: district || undefined,
     branch_name: branchName || undefined,
@@ -56,15 +101,11 @@ export default function BillsPage() {
     month_year: monthYear || undefined,
     commodity_id: commodityId ? parseInt(commodityId) : undefined,
     depositor_id: depositorId ? parseInt(depositorId) : undefined,
-    page,
-    limit: 20,
-  } as any);
+    created_by: createdBy ? parseInt(createdBy) : undefined,
+  };
 
-  // Pending bills summary — always fetches all pending bills regardless of filter
-  const { data: pendingData } = useListBills({ status: "pending", limit: 1000 } as any);
-  const pendingBills = pendingData?.bills ?? [];
-  const pendingCount = pendingData?.total ?? 0;
-  const pendingTotal = pendingBills.reduce((sum: number, b: any) => sum + (parseFloat(b.total_charge) || 0), 0);
+  const { data, isLoading } = useListBills({ ...filterParams, page, limit: 20 } as any);
+  const { data: stats } = useBillStats(filterParams);
 
   const bills = data?.bills ?? [];
   const totalPages = data?.total_pages ?? 1;
@@ -77,6 +118,7 @@ export default function BillsPage() {
     if (branchName) params.set("branch_name", branchName);
     if (financialYear) params.set("financial_year", financialYear);
     if (monthYear) params.set("month_year", monthYear);
+    if (createdBy) params.set("created_by", createdBy);
 
     const token = localStorage.getItem("mpw_token");
     try {
@@ -96,6 +138,11 @@ export default function BillsPage() {
     } catch {
       alert("Export failed. Please try again.");
     }
+  };
+
+  const clearUserFilter = () => {
+    setCreatedBy("");
+    window.history.replaceState({}, "", "/bills");
   };
 
   const resetFilters = () => {
@@ -137,26 +184,29 @@ export default function BillsPage() {
           </div>
         </div>
 
-        {/* Pending summary stats */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <Clock className="w-5 h-5 text-amber-600" />
+        {filterUser && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between">
+            <div className="text-sm text-foreground">
+              Showing bills for operator: <strong>{filterUser.name}</strong>
+              <span className="text-muted-foreground ml-2">({filterUser.email})</span>
             </div>
-            <div>
-              <div className="text-2xl font-bold text-amber-800">{pendingCount}</div>
-              <div className="text-xs text-amber-600 font-medium">Total Pending Bills</div>
-            </div>
+            <button
+              onClick={clearUserFilter}
+              className="text-xs text-primary hover:underline flex items-center gap-1"
+            >
+              <X className="w-3 h-3" /> Clear
+            </button>
           </div>
-          <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 flex items-center gap-3">
-            <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <AlertCircle className="w-5 h-5 text-orange-600" />
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-orange-800">{formatCurrency(pendingTotal)}</div>
-              <div className="text-xs text-orange-600 font-medium">Total Pending Amount</div>
-            </div>
-          </div>
+        )}
+
+        {/* Stats cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StatCard icon={<FileText className="w-4 h-4" />} label="Total Bills" value={stats?.total ?? 0} color="slate" />
+          <StatCard icon={<CheckCircle2 className="w-4 h-4" />} label="Approved" value={stats?.approved ?? 0} color="green" />
+          <StatCard icon={<Clock className="w-4 h-4" />} label="Pending" value={stats?.pending ?? 0} color="amber" />
+          <StatCard icon={<XCircle className="w-4 h-4" />} label="Rejected" value={stats?.rejected ?? 0} color="red" />
+          <StatCard icon={<IndianRupee className="w-4 h-4" />} label="Claim Amount" value={formatCurrency(stats?.claim_amount ?? 0)} color="green" />
+          <StatCard icon={<AlertCircle className="w-4 h-4" />} label="Pending Amount" value={formatCurrency(stats?.pending_amount ?? 0)} color="orange" />
         </div>
 
         {/* Filters */}
@@ -322,5 +372,24 @@ export default function BillsPage() {
         </div>
       </div>
     </Layout>
+  );
+}
+
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string | number; color: "slate" | "green" | "amber" | "red" | "orange" }) {
+  const palette = {
+    slate: "bg-slate-50 border-slate-200 text-slate-700",
+    green: "bg-green-50 border-green-200 text-green-700",
+    amber: "bg-amber-50 border-amber-200 text-amber-700",
+    red: "bg-red-50 border-red-200 text-red-700",
+    orange: "bg-orange-50 border-orange-200 text-orange-700",
+  }[color];
+  return (
+    <div className={`border rounded-xl p-3 ${palette}`}>
+      <div className="flex items-center gap-1.5 text-xs font-medium opacity-80">
+        {icon}
+        {label}
+      </div>
+      <div className="text-lg font-bold mt-1 truncate">{value}</div>
+    </div>
   );
 }

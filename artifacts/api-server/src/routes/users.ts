@@ -29,10 +29,10 @@ router.get("/v1/users", authMiddleware, requireAdmin, async (req, res): Promise<
 });
 
 router.post("/v1/users", authMiddleware, requireAdmin, async (req, res): Promise<void> => {
-  const { name, email, password, role, branch_name, district_name, mobile_number } = req.body;
+  const { name, email, password, branch_name, district_name, mobile_number } = req.body;
 
-  if (!name || !email || !password || !role) {
-    res.status(400).json({ error: "name, email, password, and role are required" });
+  if (!name || !email || !password) {
+    res.status(400).json({ error: "name, email, and password are required" });
     return;
   }
 
@@ -45,7 +45,7 @@ router.post("/v1/users", authMiddleware, requireAdmin, async (req, res): Promise
   const password_hash = await bcrypt.hash(password, 10);
   const [user] = await db
     .insert(usersTable)
-    .values({ name, email, password_hash, role, branch_name, district_name, mobile_number })
+    .values({ name, email, password_hash, role: "operator", branch_name, district_name, mobile_number })
     .returning();
 
   res.status(201).json(sanitizeUser(user));
