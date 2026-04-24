@@ -15,7 +15,7 @@ pnpm workspace monorepo using TypeScript. Each package manages its own dependenc
 ## Key Features
 
 - **Auth**: JWT-based (token in localStorage key `mpw_token`), roles: `admin` / `operator`
-- **Bills**: Create, view, filter, approve/reject, export CSV
+- **Bills**: Create, view, filter, approve/reject, export/import CSV (admin payment-tracking workflow)
 - **Versioning**: Operators request edits/deletes; admins approve/reject
 - **Commodities**: Admin-managed crop+year catalog with per-bag-per-month rates
 - **Depositors**: Used in bill approval (depositor, pass amount, payment method)

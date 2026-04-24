@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { useListBills, useListCommodities, useListUsers } from "@workspace/api-client-react";
+import { useListBills, useListCommodities, useListUsers, getListBillsQueryKey } from "@workspace/api-client-react";
 import { useQuery } from "@tanstack/react-query";
 import { Layout } from "@/components/Layout";
 import { StatusBadge } from "@/components/StatusBadge";
 import { useAuth } from "@/lib/auth";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { Plus, Download, ChevronLeft, ChevronRight, Clock, AlertCircle, FileText, CheckCircle2, XCircle, IndianRupee, X } from "lucide-react";
+import { Plus, Download, Upload, ChevronLeft, ChevronRight, Clock, AlertCircle, FileText, CheckCircle2, XCircle, IndianRupee, X } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { MP_DISTRICTS } from "@/lib/districts";
 
 interface FilterOptions {
@@ -63,6 +65,9 @@ const selectClass =
 
 export default function BillsPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [importing, setImporting] = useState(false);
   const [location] = useLocation();
   const [status, setStatus] = useState("");
   const [district, setDistrict] = useState("");
@@ -127,6 +132,8 @@ export default function BillsPage() {
     if (branchName) params.set("branch_name", branchName);
     if (financialYear) params.set("financial_year", financialYear);
     if (monthYear) params.set("month_year", monthYear);
+    if (commodityId) params.set("commodity_id", commodityId);
+    if (depositorId) params.set("depositor_id", depositorId);
     if (createdBy) params.set("created_by", createdBy);
 
     const token = localStorage.getItem("mpw_token");
@@ -146,6 +153,46 @@ export default function BillsPage() {
       URL.revokeObjectURL(url);
     } catch {
       alert("Export failed. Please try again.");
+    }
+  };
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // allow re-uploading the same filename later
+    if (!file) return;
+    setImporting(true);
+    try {
+      const token = localStorage.getItem("mpw_token");
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch(`/api/v1/bills/import`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json?.error || "Import failed");
+      const errCount = Array.isArray(json.errors) ? json.errors.length : 0;
+      const errSample = errCount > 0
+        ? ` First error — row ${json.errors[0].row}: ${json.errors[0].reason}.`
+        : "";
+      toast({
+        title: errCount > 0 ? "Import completed with issues" : "Import successful",
+        description: `Updated ${json.updated} bill${json.updated === 1 ? "" : "s"}.` +
+          (errCount > 0 ? ` ${errCount} row${errCount === 1 ? "" : "s"} skipped.${errSample}` : ""),
+        variant: errCount > 0 ? "destructive" : undefined,
+      });
+      // Refresh bills list & stats after import
+      queryClient.invalidateQueries({ queryKey: getListBillsQueryKey() });
+      queryClient.invalidateQueries({ queryKey: ["bills-stats"] });
+    } catch (err) {
+      toast({
+        title: "Import failed",
+        description: err instanceof Error ? err.message : "Unable to import the file.",
+        variant: "destructive",
+      });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -179,13 +226,32 @@ export default function BillsPage() {
           </div>
           <div className="flex items-center gap-2">
             {user?.role === "admin" && (
-              <button
-                onClick={handleExport}
-                className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export CSV
-              </button>
+              <>
+                <button
+                  onClick={handleExport}
+                  className="flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm hover:bg-muted transition-colors"
+                  title="Download bills as CSV (with Sr, Branch, Bill No., Commodity, Amounts, Cheque/Advice details, Remarks)"
+                >
+                  <Download className="w-4 h-4" />
+                  Export CSV
+                </button>
+                <label
+                  className={`flex items-center gap-2 px-3 py-2 border border-border rounded-lg text-sm transition-colors cursor-pointer ${
+                    importing ? "opacity-60 cursor-not-allowed" : "hover:bg-muted"
+                  }`}
+                  title="Upload an edited CSV to fill in GST tax, Amount Passed, Cheque/RTGS, Advice and Remarks for existing bills (matched by Sr)"
+                >
+                  <Upload className="w-4 h-4" />
+                  {importing ? "Importing…" : "Import CSV"}
+                  <input
+                    type="file"
+                    accept=".csv,text/csv"
+                    className="hidden"
+                    disabled={importing}
+                    onChange={handleImportFile}
+                  />
+                </label>
+              </>
             )}
             {user?.role === "operator" && (
               <Link href="/bills/new">
