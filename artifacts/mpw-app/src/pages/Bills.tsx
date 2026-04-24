@@ -74,12 +74,13 @@ export default function BillsPage() {
   const [createdBy, setCreatedBy] = useState<string>("");
   const [page, setPage] = useState(1);
 
-  // Read created_by from URL on first load / when URL changes
+  // Read created_by / commodity_id / depositor_id from URL on first load / when URL changes
   useEffect(() => {
     const search = typeof window !== "undefined" ? window.location.search : "";
     const params = new URLSearchParams(search);
-    const cb = params.get("created_by") ?? "";
-    setCreatedBy(cb);
+    setCreatedBy(params.get("created_by") ?? "");
+    setCommodityId(params.get("commodity_id") ?? "");
+    setDepositorId(params.get("depositor_id") ?? "");
     setPage(1);
   }, [location]);
 
@@ -91,6 +92,14 @@ export default function BillsPage() {
   const filterUser = useMemo(
     () => (createdBy ? usersList.find((u) => String(u.id) === createdBy) : undefined),
     [createdBy, usersList],
+  );
+  const filterCommodity = useMemo(
+    () => (commodityId ? commodities.find((c) => String(c.id) === commodityId) : undefined),
+    [commodityId, commodities],
+  );
+  const filterDepositor = useMemo(
+    () => (depositorId ? (filterOptions?.depositors ?? []).find((d) => String(d.id) === depositorId) : undefined),
+    [depositorId, filterOptions?.depositors],
   );
 
   const filterParams = {
@@ -140,9 +149,14 @@ export default function BillsPage() {
     }
   };
 
-  const clearUserFilter = () => {
-    setCreatedBy("");
-    window.history.replaceState({}, "", "/bills");
+  const clearUrlFilter = (key: "created_by" | "commodity_id" | "depositor_id") => {
+    if (key === "created_by") setCreatedBy("");
+    if (key === "commodity_id") setCommodityId("");
+    if (key === "depositor_id") setDepositorId("");
+    const sp = new URLSearchParams(window.location.search);
+    sp.delete(key);
+    const qs = sp.toString();
+    window.history.replaceState({}, "", `/bills${qs ? `?${qs}` : ""}`);
   };
 
   const resetFilters = () => {
@@ -184,18 +198,33 @@ export default function BillsPage() {
           </div>
         </div>
 
-        {filterUser && (
-          <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 flex items-center justify-between">
-            <div className="text-sm text-foreground">
-              Showing bills for operator: <strong>{filterUser.name}</strong>
-              <span className="text-muted-foreground ml-2">({filterUser.email})</span>
-            </div>
-            <button
-              onClick={clearUserFilter}
-              className="text-xs text-primary hover:underline flex items-center gap-1"
-            >
-              <X className="w-3 h-3" /> Clear
-            </button>
+        {(filterUser || filterCommodity || filterDepositor) && (
+          <div className="bg-primary/5 border border-primary/20 rounded-xl px-4 py-3 flex flex-wrap items-center gap-2">
+            <span className="text-sm text-foreground font-medium">Showing bills for:</span>
+            {filterUser && (
+              <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs px-2.5 py-1 rounded-full">
+                Operator: <strong>{filterUser.name}</strong>
+                <button onClick={() => clearUrlFilter("created_by")} className="hover:opacity-70">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {filterCommodity && (
+              <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs px-2.5 py-1 rounded-full">
+                Commodity: <strong>{filterCommodity.crop_name} ({filterCommodity.crop_year})</strong>
+                <button onClick={() => clearUrlFilter("commodity_id")} className="hover:opacity-70">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
+            {filterDepositor && (
+              <span className="inline-flex items-center gap-1.5 bg-primary/10 text-primary text-xs px-2.5 py-1 rounded-full">
+                Depositor: <strong>{filterDepositor.name}</strong>
+                <button onClick={() => clearUrlFilter("depositor_id")} className="hover:opacity-70">
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            )}
           </div>
         )}
 

@@ -1,11 +1,17 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useListDepositors, useCreateDepositor, getListDepositorsQueryKey } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
-import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, Eye } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function DepositorsPage() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const isAdmin = user?.role === "admin";
+  const viewBills = (depositorId: number) => navigate(`/bills?depositor_id=${depositorId}`);
   const { data: rawDepositors = [], isLoading } = useListDepositors();
   const depositors = [...rawDepositors].sort((a, b) => b.id - a.id);
   const createMutation = useCreateDepositor();
@@ -145,7 +151,16 @@ export default function DepositorsPage() {
                 <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No depositors yet</td></tr>
               ) : depositors.map((d) => (
                 <>
-                  <tr key={d.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                  <tr
+                    key={d.id}
+                    className={`border-b border-border last:border-0 hover:bg-muted/20 ${isAdmin && editId !== d.id ? "cursor-pointer" : ""}`}
+                    onClick={(e) => {
+                      if (!isAdmin || editId === d.id) return;
+                      const target = e.target as HTMLElement;
+                      if (target.closest("button") || target.closest("a") || target.closest("input") || target.closest("select")) return;
+                      viewBills(d.id);
+                    }}
+                  >
                     {editId === d.id ? (
                       <>
                         <td className="px-4 py-2">
@@ -171,6 +186,15 @@ export default function DepositorsPage() {
                         <td className="px-4 py-3 text-right text-foreground">{d.total_gst != null ? `${d.total_gst}%` : "—"}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 justify-end">
+                            {isAdmin && (
+                              <button
+                                onClick={() => viewBills(d.id)}
+                                title="View bills for this depositor"
+                                className="p-1.5 text-muted-foreground hover:text-primary hover:bg-muted rounded-md transition-colors"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             <button onClick={() => { setEditId(d.id); setEditForm({ name: d.name, gst_no: d.gst_no ?? "", total_gst: d.total_gst != null ? String(d.total_gst) : "" }); }}
                               className="p-1.5 text-muted-foreground hover:text-primary hover:bg-muted rounded-md transition-colors">
                               <Pencil className="w-3.5 h-3.5" />

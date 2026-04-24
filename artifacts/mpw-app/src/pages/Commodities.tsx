@@ -1,11 +1,17 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { useListCommodities, useCreateCommodity, useUpdateCommodity, getListCommoditiesQueryKey } from "@workspace/api-client-react";
 import { Layout } from "@/components/Layout";
-import { Plus, Pencil, Trash2, X, Check } from "lucide-react";
+import { Plus, Pencil, Trash2, X, Check, Eye } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/lib/auth";
 
 export default function CommoditiesPage() {
+  const { user } = useAuth();
+  const [, navigate] = useLocation();
+  const isAdmin = user?.role === "admin";
+  const viewBills = (commodityId: number) => navigate(`/bills?commodity_id=${commodityId}`);
   const { data: rawCommodities = [], isLoading } = useListCommodities();
   const commodities = [...rawCommodities].sort((a, b) => b.id - a.id);
   const createMutation = useCreateCommodity();
@@ -146,7 +152,16 @@ export default function CommoditiesPage() {
                 <tr><td colSpan={4} className="text-center py-8 text-muted-foreground">No commodities yet</td></tr>
               ) : commodities.map((c) => (
                 <>
-                  <tr key={c.id} className="border-b border-border last:border-0 hover:bg-muted/20">
+                  <tr
+                    key={c.id}
+                    className={`border-b border-border last:border-0 hover:bg-muted/20 ${isAdmin && editId !== c.id ? "cursor-pointer" : ""}`}
+                    onClick={(e) => {
+                      if (!isAdmin || editId === c.id) return;
+                      const target = e.target as HTMLElement;
+                      if (target.closest("button") || target.closest("a") || target.closest("input") || target.closest("select")) return;
+                      viewBills(c.id);
+                    }}
+                  >
                     {editId === c.id ? (
                       <>
                         <td className="px-4 py-2"><input value={editForm.crop_name} onChange={(e) => setEditForm({ ...editForm, crop_name: e.target.value })} className={cellInput} /></td>
@@ -166,6 +181,15 @@ export default function CommoditiesPage() {
                         <td className="px-4 py-3 text-right text-foreground">₹{c.per_bag_per_month}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2 justify-end">
+                            {isAdmin && (
+                              <button
+                                onClick={() => viewBills(c.id)}
+                                title="View bills for this commodity"
+                                className="p-1.5 text-muted-foreground hover:text-primary hover:bg-muted rounded-md transition-colors"
+                              >
+                                <Eye className="w-3.5 h-3.5" />
+                              </button>
+                            )}
                             <button onClick={() => { setEditId(c.id); setEditForm({ crop_name: c.crop_name, crop_year: c.crop_year, per_bag_per_month: String(c.per_bag_per_month) }); }}
                               className="p-1.5 text-muted-foreground hover:text-primary hover:bg-muted rounded-md transition-colors">
                               <Pencil className="w-3.5 h-3.5" />
