@@ -9,6 +9,7 @@ import approvalsRouter from "./approvals";
 import notificationsRouter from "./notifications";
 import dashboardRouter from "./dashboard";
 import uploadRouter from "./upload";
+import reportsRouter from "./reports";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(approvalsRouter);
 router.use(notificationsRouter);
 router.use(dashboardRouter);
 router.use(uploadRouter);
+router.use(reportsRouter);
 
 export default router;

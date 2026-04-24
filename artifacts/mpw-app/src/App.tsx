@@ -16,6 +16,7 @@ import CommoditiesPage from "@/pages/Commodities";
 import DepositorsPage from "@/pages/Depositors";
 import UsersPage from "@/pages/Users";
 import ProfilePage from "@/pages/Profile";
+import ReportsPage from "@/pages/Reports";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -82,6 +83,9 @@ function AppRoutes() {
       </Route>
       <Route path="/versions">
         <RequireAuth adminOnly><VersionsPage /></RequireAuth>
+      </Route>
+      <Route path="/reports">
+        <RequireAuth adminOnly><ReportsPage /></RequireAuth>
       </Route>
       <Route path="/profile">
         <RequireAuth><ProfilePage /></RequireAuth>

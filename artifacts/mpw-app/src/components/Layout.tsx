@@ -14,6 +14,7 @@ import {
   Menu,
   X,
   PlusCircle,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useListNotifications, useMarkAllNotificationsRead, getListNotificationsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -36,6 +37,7 @@ const navItems: NavItem[] = [
   { label: "Depositors", href: "/depositors", icon: Building2, adminOnly: true },
   { label: "Users", href: "/users", icon: Users, adminOnly: true },
   { label: "Edit Requests", href: "/versions", icon: GitBranch, adminOnly: true },
+  { label: "Reports", href: "/reports", icon: FileSpreadsheet, adminOnly: true },
   { label: "Profile", href: "/profile", icon: User },
 ];
 
