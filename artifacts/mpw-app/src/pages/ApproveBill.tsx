@@ -179,6 +179,16 @@ export default function ApproveBillPage() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Total Charge (₹)</label>
+              <input
+                type="number"
+                value={Number(bill?.total_charge ?? 0).toFixed(2)}
+                readOnly
+                disabled
+                className={inputClass + " bg-muted/50 cursor-not-allowed"}
+              />
+            </div>
+            <div>
               <label className="block text-sm font-medium text-foreground mb-1.5">Pass Amount (₹) *</label>
               <input
                 type="number"
@@ -201,6 +211,20 @@ export default function ApproveBillPage() {
               />
             </div>
             <div>
+              <label className="block text-sm font-medium text-foreground mb-1.5">Balance Amount (₹)</label>
+              <input
+                type="number"
+                value={(
+                  Number(bill?.total_charge ?? 0) -
+                  (parseFloat(form.deduction_amount) || 0) -
+                  (parseFloat(form.pass_amount) || 0)
+                ).toFixed(2)}
+                readOnly
+                disabled
+                className={inputClass + " bg-muted/50 cursor-not-allowed"}
+              />
+            </div>
+            <div className="col-span-2">
               <label className="block text-sm font-medium text-foreground mb-1.5">Payment Method *</label>
               <select
                 value={form.payment_method}
